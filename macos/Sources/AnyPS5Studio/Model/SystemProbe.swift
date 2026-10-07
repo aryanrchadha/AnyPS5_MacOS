@@ -1,7 +1,6 @@
 import Darwin
 import Foundation
 
-/// One Wine-compatible launcher found on this Mac.
 struct WineRuntime: Identifiable, Equatable, Hashable {
     let name: String
     let executable: URL
@@ -26,8 +25,6 @@ struct SystemReport: Equatable {
         ByteCountFormatter.string(fromByteCount: Int64(memoryBytes), countStyle: .memory)
     }
 
-    /// Rosetta 2 translates AVX and AVX2 starting with macOS 15 Sequoia. PS5 code targets
-    /// Zen 2 and uses AVX2 freely, so older releases fault on the first such instruction.
     var rosettaHasAVX2: Bool { macOSVersion.majorVersion >= 15 }
 
     static func == (lhs: SystemReport, rhs: SystemReport) -> Bool {
@@ -89,8 +86,6 @@ enum SystemProbe {
     }
 }
 
-/// Finds the relinker binary: an explicit override, the copy inside the app bundle,
-/// a source checkout build, then PATH.
 enum RelinkerLocator {
     static let overrideKey = "relinkerPathOverride"
 
@@ -105,7 +100,6 @@ enum RelinkerLocator {
             return bundled
         }
         var candidates: [String] = []
-        // `swift run` from macos/: the binary sits in macos/.build/<config>/.
         var directory = Bundle.main.executableURL?.deletingLastPathComponent()
         for _ in 0..<6 {
             guard let current = directory else { break }

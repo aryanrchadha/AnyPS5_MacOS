@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Builds "AnyPS5 Studio.app": the native relinker plus the SwiftUI front end.
-#
-#   macos/scripts/build-app.sh            # arm64 (Apple Silicon)
-#   ARCHS="arm64 x86_64" macos/scripts/build-app.sh   # universal
-#   DMG=1 macos/scripts/build-app.sh      # also produce a .dmg
-#
-# Requires Xcode or the Command Line Tools (swift, clang), and CMake.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -47,7 +40,6 @@ cp "$BUILD/relinker/core/relinker/relinker" "$APP/Contents/MacOS/relinker"
 sed -e "s/__VERSION__/${VERSION#v}/" -e "s/__BUILD__/${BUILD_NUMBER}/" \
     "$MACOS/Resources/Info.plist" > "$APP/Contents/Info.plist"
 
-# The icon is drawn in SwiftUI (Design/AppIcon.swift); the app renders it at 1024 px.
 ICON_PNG="$BUILD/AppIcon.png"
 ICONSET="$BUILD/AppIcon.iconset"
 rm -rf "$ICONSET" "$ICON_PNG"
@@ -65,7 +57,6 @@ else
 fi
 
 step "Sign (ad hoc)"
-# Apple Silicon refuses unsigned arm64 code. Sign the helper first, then the bundle.
 codesign --force --sign - --timestamp=none "$APP/Contents/MacOS/relinker"
 codesign --force --sign - --timestamp=none "$APP"
 codesign --verify --strict "$APP"

@@ -184,6 +184,7 @@ struct SettingsView: View {
     @AppStorage(RelinkerLocator.overrideKey) private var relinkerOverride = ""
 
     var body: some View {
+        @Bindable var model = model
         Form {
             Section("Relinker") {
                 HStack {
@@ -201,9 +202,31 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
             }
+            Section {
+                TextEditor(text: $model.wineEnvironment)
+                    .font(.mono)
+                    .frame(minHeight: 110)
+                HStack {
+                    Text("One KEY=value per line. Lines starting with # are ignored.")
+                        .font(.captionText)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Restore Defaults") { model.wineEnvironment = AppModel.defaultWineEnvironment }
+                }
+            } header: {
+                Text("Wine launch environment")
+            }
+            Section("Conversion") {
+                LabeledContent("Switches") {
+                    Button("Reset to Defaults") { model.resetSettings() }
+                }
+                Text("Target, switches and the library search path are remembered between launches.")
+                    .font(.captionText)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 520)
+        .frame(width: 560)
         .onChange(of: relinkerOverride) { model.refreshEnvironment() }
     }
 }

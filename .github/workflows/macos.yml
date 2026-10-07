@@ -43,7 +43,6 @@ jobs:
           ctest --test-dir build-tests --output-on-failure --timeout 120 2>&1 | tee ctest.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
-            # Surface each failing test's output as an annotation: job logs are not always retrievable.
             for test in $(sed -n 's/^[0-9]*:\(.*\)$/\1/p' build-tests/Testing/Temporary/LastTestsFailed.log); do
               detail=$(ctest --test-dir build-tests -R "^${test}\$" --output-on-failure 2>&1 | grep -vE '^(Test project|      Start|Total Test time|Errors while|Output from|Use \"--rerun)' | tail -25 | python3 -c "import sys; print(sys.stdin.read().replace('%', '%25').replace('\r', '').replace('\n', '%0A'))")
               echo "::error title=ctest ${test}::${detail}"

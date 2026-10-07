@@ -29,7 +29,6 @@ add_compile_definitions(APS5_ENABLE_TIMING_LOG=$<BOOL:${APS5_ENABLE_TIMING_LOG}>
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# macOS hosts build only the relinker: the system libraries target Linux and Windows guests.
 if(APPLE)
     set(ANYPS5_RELINKER_ONLY_DEFAULT ON)
 else()

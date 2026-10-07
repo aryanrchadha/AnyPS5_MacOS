@@ -1,9 +1,6 @@
 import AppKit
 import SwiftUI
 
-// MARK: - Double-bezel card
-
-/// A content core seated inside a thin outer tray, with concentric radii.
 struct BezelCard<Content: View>: View {
     var padding: CGFloat = 22
     @ViewBuilder var content: Content
@@ -55,8 +52,6 @@ struct CardHeader: View {
         }
     }
 }
-
-// MARK: - Typography helpers
 
 struct Eyebrow: View {
     let text: String
@@ -120,9 +115,6 @@ struct Chip: View {
     }
 }
 
-// MARK: - Buttons
-
-/// Primary pill with a nested trailing icon that drifts on hover and compresses on press.
 struct IslandButton: View {
     let title: String
     var symbol = "arrow.up.right"
@@ -196,8 +188,6 @@ struct PressableStyle: ButtonStyle {
     }
 }
 
-// MARK: - Segmented control
-
 struct GlassSegmented<Value: Hashable & Identifiable>: View {
     let options: [Value]
     @Binding var selection: Value
@@ -235,8 +225,6 @@ struct GlassSegmented<Value: Hashable & Identifiable>: View {
         .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
     }
 }
-
-// MARK: - Toggle row
 
 struct OptionRow: View {
     let title: String
@@ -277,8 +265,6 @@ struct Hairline: View {
     }
 }
 
-// MARK: - Entry choreography
-
 private struct RevealModifier: ViewModifier {
     let delay: Double
     @State var visible = false
@@ -299,9 +285,6 @@ extension View {
     func reveal(_ delay: Double = 0) -> some View { modifier(RevealModifier(delay: delay)) }
 }
 
-// MARK: - Backdrop
-
-/// OLED canvas, two slow orbs and a fixed film grain. Nothing here scrolls.
 struct Backdrop: View {
     @State var drift = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -356,10 +339,6 @@ enum GrainTexture {
     }()
 }
 
-// MARK: - Bento row
-
-/// Lays children side by side with fixed width ratios and a shared height, so
-/// neighbouring cards in a bento row always align top and bottom.
 struct WeightedRow: Layout {
     var weights: [CGFloat]
     var spacing: CGFloat = 20

@@ -1,6 +1,5 @@
 import Foundation
 
-/// What the first bytes of the selected executable say about it.
 enum ExecutableKind: Equatable {
     case elf
     case selfContainer
@@ -34,7 +33,6 @@ struct ModuleDirectory: Identifiable, Equatable {
     var id: String { name }
 }
 
-/// Static inspection of a game folder, matching the rules in GuestModuleBuilder.cpp.
 struct GameInspection: Equatable {
     let executable: URL
     let kind: ExecutableKind
@@ -66,7 +64,6 @@ struct GameInspection: Equatable {
 enum GameInspector {
     static let executableCandidates = ["eboot.bin", "eboot.elf"]
 
-    /// Accepts the executable itself or the game folder that contains it.
     static func resolveExecutable(from url: URL) -> URL? {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { return nil }
@@ -149,7 +146,6 @@ enum GameInspector {
         return (result, nil)
     }
 
-    /// Mirrors ParamJsonParser.cpp: defaultLanguage, then en-US, then the first entry.
     private static func readParamJson(_ url: URL) -> (String?, String?) {
         guard let data = try? Data(contentsOf: url),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return (nil, nil) }

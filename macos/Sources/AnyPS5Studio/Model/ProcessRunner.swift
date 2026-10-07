@@ -19,8 +19,6 @@ struct LogLine: Identifiable, Equatable {
     }
 }
 
-/// Runs one child process at a time and streams its output line by line.
-/// State is mutated on the main queue only.
 @Observable
 final class ProcessRunner {
     enum State: Equatable {
@@ -108,8 +106,6 @@ final class ProcessRunner {
         process?.terminate()
     }
 
-    // MARK: - Streaming
-
     private func attach(_ pipe: Pipe, as source: LogLine.Source) {
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
@@ -122,7 +118,6 @@ final class ProcessRunner {
         }
     }
 
-    /// Runs on `ioQueue`. Splits complete lines and keeps the trailing fragment.
     private func consume(_ data: Data, from source: LogLine.Source) {
         guard !data.isEmpty else { return }
         var buffer = pending[source, default: Data()]

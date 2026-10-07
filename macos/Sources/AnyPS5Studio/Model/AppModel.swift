@@ -1,14 +1,16 @@
 import AppKit
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 enum Route: String, CaseIterable, Identifiable {
-    case convert, console, system
+    case convert, library, console, system
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .convert: "Convert"
+        case .library: "Library"
         case .console: "Console"
         case .system: "System"
         }
@@ -17,13 +19,13 @@ enum Route: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .convert: "arrow.triangle.2.circlepath"
+        case .library: "square.grid.2x2"
         case .console: "text.alignleft"
         case .system: "cpu"
         }
     }
 }
 
-/// Presence of the files the converted title needs at run time (docs/user/USAGE.md, "Runtime layout").
 struct RuntimeLayout: Equatable {
     var executableExists: Bool
     var libraryDirectory: URL?
@@ -37,13 +39,24 @@ struct RuntimeLayout: Equatable {
 
 @Observable
 final class AppModel {
+    static let defaultWineEnvironment = "WINEDEBUG=-all\nWINEMSYNC=1\nWINEESYNC=1"
+
     var route: Route = .convert
-    var settings = ConversionSettings()
+    var settings: ConversionSettings {
+        didSet { persistSettings() }
+    }
     private(set) var inspection: GameInspection?
+    private(set) var queue: [GameInspection] = []
+    private(set) var isBatchRunning = false
+    @ObservationIgnored private var batchFailures = 0
+    @ObservationIgnored private var batchCount = 0
     var outputDirectory: URL? {
         didSet { UserDefaults.standard.set(outputDirectory?.path, forKey: Keys.outputDirectory) }
     }
     var outputName = "app"
+    var wineEnvironment: String {
+        didSet { UserDefaults.standard.set(wineEnvironment, forKey: Keys.wineEnvironment) }
+    }
     private(set) var relinker: URL?
     private(set) var system: SystemReport
     private(set) var layout: RuntimeLayout?
@@ -51,28 +64,38 @@ final class AppModel {
     var banner: String?
 
     let runner = ProcessRunner()
+    let library = LibraryStore()
 
     private enum Keys {
         static let outputDirectory = "outputDirectory"
+        static let settings = "conversionSettings"
+        static let wineEnvironment = "wineEnvironment"
     }
 
     init() {
+        let defaults = UserDefaults.standard
+        settings = defaults.data(forKey: Keys.settings)
+            .flatMap { try? JSONDecoder().decode(ConversionSettings.self, from: $0) } ?? ConversionSettings()
+        wineEnvironment = defaults.string(forKey: Keys.wineEnvironment) ?? AppModel.defaultWineEnvironment
         system = SystemProbe.report()
         relinker = RelinkerLocator.locate()
         selectedWine = system.wineRuntimes.first
-        if let saved = UserDefaults.standard.string(forKey: Keys.outputDirectory) {
+        if let saved = defaults.string(forKey: Keys.outputDirectory) {
             outputDirectory = URL(fileURLWithPath: saved, isDirectory: true)
         }
     }
 
-    // MARK: - Derived
-
     var outputExecutable: URL? {
-        guard let directory = outputDirectory, let inspection else { return nil }
-        let name = outputName.isEmpty ? inspection.suggestedOutputName : outputName
+        guard let inspection else { return nil }
+        return outputExecutable(for: inspection, name: outputName)
+    }
+
+    func outputExecutable(for inspection: GameInspection, name: String) -> URL? {
+        guard let directory = outputDirectory else { return nil }
+        let resolved = name.isEmpty ? inspection.suggestedOutputName : name
         return directory
-            .appendingPathComponent(name, isDirectory: true)
-            .appendingPathComponent(name)
+            .appendingPathComponent(resolved, isDirectory: true)
+            .appendingPathComponent(resolved)
             .appendingPathExtension(settings.target.fileExtension)
     }
 
@@ -97,7 +120,17 @@ final class AppModel {
 
     var canConvert: Bool { blockingIssue == nil && !runner.state.isRunning }
 
-    // MARK: - Intents
+    var parsedWineEnvironment: [String: String] {
+        var result: [String: String] = [:]
+        for line in wineEnvironment.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#"), let separator = trimmed.firstIndex(of: "=") else { continue }
+            let key = trimmed[..<separator].trimmingCharacters(in: .whitespaces)
+            guard !key.isEmpty else { continue }
+            result[key] = String(trimmed[trimmed.index(after: separator)...])
+        }
+        return result
+    }
 
     func refreshEnvironment() {
         system = SystemProbe.report()
@@ -108,33 +141,81 @@ final class AppModel {
     }
 
     func open(_ url: URL) {
-        guard let executable = GameInspector.resolveExecutable(from: url) else {
-            banner = "No eboot.bin was found in \(url.lastPathComponent). Choose the executable directly."
-            return
+        open([url])
+    }
+
+    func open(_ urls: [URL]) {
+        var found: [GameInspection] = []
+        var missing: [String] = []
+        for url in urls {
+            if let executable = GameInspector.resolveExecutable(from: url) {
+                found.append(GameInspector.inspect(executable))
+            } else {
+                missing.append(url.lastPathComponent)
+            }
         }
-        let result = GameInspector.inspect(executable)
-        inspection = result
-        outputName = result.suggestedOutputName
+        banner = missing.isEmpty ? nil : "No eboot.bin was found in \(missing.joined(separator: ", ")). Choose the executable directly."
+        guard let first = found.first else { return }
+        select(first)
+        let additions = found.dropFirst().filter { candidate in
+            !queue.contains { $0.executable == candidate.executable } && candidate.executable != first.executable
+        }
+        queue.append(contentsOf: additions)
         if outputDirectory == nil {
             outputDirectory = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("AnyPS5", isDirectory: true)
         }
-        banner = nil
         refreshLayout()
+        updateDockBadge()
+    }
+
+    func reopen(_ entry: LibraryEntry) {
+        guard entry.sourceExists else {
+            banner = "\(entry.source.path) no longer exists."
+            return
+        }
+        settings.target = entry.target
+        outputDirectory = entry.output.deletingLastPathComponent().deletingLastPathComponent()
+        select(GameInspector.inspect(entry.source))
+        outputName = entry.output.deletingPathExtension().lastPathComponent
+        route = .convert
+        refreshLayout()
+    }
+
+    private func select(_ candidate: GameInspection) {
+        inspection = candidate
+        outputName = candidate.suggestedOutputName
+        queue.removeAll { $0.executable == candidate.executable }
     }
 
     func reinspect() {
         guard let executable = inspection?.executable else { return }
         inspection = GameInspector.inspect(executable)
+        queue = queue.map { GameInspector.inspect($0.executable) }
+    }
+
+    func removeFromQueue(_ item: GameInspection) {
+        queue.removeAll { $0.executable == item.executable }
+        updateDockBadge()
+    }
+
+    func clearQueue() {
+        queue.removeAll()
+        updateDockBadge()
+    }
+
+    func resetSettings() {
+        settings = ConversionSettings()
+        refreshLayout()
     }
 
     func chooseExecutable() {
         let panel = NSOpenPanel()
-        panel.title = "Choose a decrypted game executable or its folder"
+        panel.title = "Choose decrypted game executables or their folders"
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK, let url = panel.url { open(url) }
+        panel.allowsMultipleSelection = true
+        if panel.runModal() == .OK { open(panel.urls) }
     }
 
     func chooseOutputDirectory() {
@@ -150,55 +231,130 @@ final class AppModel {
         }
     }
 
+    func convertAll() {
+        guard canConvert else { return }
+        isBatchRunning = true
+        batchFailures = 0
+        batchCount = 0
+        convert()
+    }
+
     func convert() {
-        guard canConvert, let relinker, let arguments = commandArguments, let output = outputExecutable else { return }
+        guard canConvert, let relinker, let inspection, let arguments = commandArguments, let output = outputExecutable else {
+            isBatchRunning = false
+            return
+        }
         do {
             try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
         } catch {
             banner = "Could not create the output folder: \(error.localizedDescription)"
+            isBatchRunning = false
             return
         }
         route = .console
-        runner.run(label: "Conversion", executable: relinker, arguments: arguments,
+        runner.run(label: "Converting \(inspection.displayTitle)", executable: relinker, arguments: arguments,
                    workingDirectory: output.deletingLastPathComponent()) { [weak self] code in
-            guard let self else { return }
-            switch code {
-            case 0: self.runner.note("Conversion finished. Check the runtime layout before launching.")
-            case 1: self.runner.note("The relinker rejected the arguments (exit code 1).")
-            case 2: self.runner.note("Conversion failed (exit code 2). The reason is printed above.")
-            default: self.runner.note("The relinker exited with code \(code).")
-            }
-            self.refreshLayout()
+            self?.conversionFinished(inspection, output: output, code: code)
+        }
+        updateDockBadge()
+    }
+
+    private func conversionFinished(_ inspection: GameInspection, output: URL, code: Int32) {
+        switch code {
+        case 0: runner.note("\(inspection.displayTitle): conversion finished.")
+        case 1: runner.note("\(inspection.displayTitle): the relinker rejected the arguments (exit code 1).")
+        case 2: runner.note("\(inspection.displayTitle): conversion failed (exit code 2). The reason is printed above.")
+        default: runner.note("\(inspection.displayTitle): the relinker exited with code \(code).")
+        }
+        library.record(LibraryEntry(
+            title: inspection.displayTitle,
+            titleId: inspection.titleId,
+            source: inspection.executable,
+            output: output,
+            target: settings.target,
+            convertedAt: Date(),
+            exitCode: code,
+            iconURL: inspection.iconURL
+        ))
+        refreshLayout()
+        batchCount += 1
+        if code != 0 { batchFailures += 1 }
+
+        if isBatchRunning, let next = nextConvertibleQueueItem() {
+            select(next)
+            refreshLayout()
+            updateDockBadge()
+            convert()
+            return
+        }
+        let batch = isBatchRunning
+        isBatchRunning = false
+        updateDockBadge()
+        if batch {
+            SystemNotifier.post(
+                title: batchFailures == 0 ? "Batch conversion finished" : "Batch conversion finished with failures",
+                body: "\(batchCount - batchFailures) of \(batchCount) titles converted."
+            )
+        } else {
+            SystemNotifier.post(title: code == 0 ? "Conversion finished" : "Conversion failed", body: inspection.displayTitle)
         }
     }
 
-    func cancel() { runner.terminate() }
+    private func nextConvertibleQueueItem() -> GameInspection? {
+        while let candidate = queue.first {
+            queue.removeFirst()
+            if let issue = candidate.blockingIssue {
+                runner.note("Skipping \(candidate.displayTitle): \(issue)")
+                continue
+            }
+            return candidate
+        }
+        return nil
+    }
+
+    func cancel() {
+        isBatchRunning = false
+        runner.terminate()
+        updateDockBadge()
+    }
 
     func launch() {
-        guard let output = outputExecutable, settings.target == .windows, let wine = selectedWine else { return }
+        guard let output = outputExecutable else { return }
+        launch(output: output, target: settings.target)
+    }
+
+    func launch(_ entry: LibraryEntry) {
+        launch(output: entry.output, target: entry.target)
+    }
+
+    private func launch(output: URL, target: TargetPlatform) {
+        guard target == .windows, let wine = selectedWine else { return }
         route = .console
         runner.run(label: "Launch via \(wine.name)", executable: wine.executable, arguments: [output.path],
                    workingDirectory: output.deletingLastPathComponent(),
-                   environment: ["WINEDEBUG": "-all", "WINEMSYNC": "1", "WINEESYNC": "1"])
+                   environment: parsedWineEnvironment)
+    }
+
+    func reveal(_ url: URL) {
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            NSWorkspace.shared.open(url.deletingLastPathComponent())
+        }
     }
 
     func revealOutput() {
         guard let output = outputExecutable else { return }
-        if FileManager.default.fileExists(atPath: output.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([output])
-        } else {
-            NSWorkspace.shared.open(output.deletingLastPathComponent())
-        }
+        reveal(output)
     }
 
-    /// Copies `*.prx` system libraries, built on a Linux or Windows host for the chosen
-    /// target, into the library search path.
     func importSystemLibraries() {
         guard let output = outputExecutable,
               let destination = settings.libraryDirectory(besides: output) else { return }
+        let platform = settings.target == .windows ? "Windows" : "Linux"
         let panel = NSOpenPanel()
-        panel.title = "Choose the folder with \(settings.target == .windows ? "Windows" : "Linux") system libraries (*.prx)"
-        panel.message = "Built with `cmake --build build --target libs` on a \(settings.target == .windows ? "Windows" : "Linux") host: build/core/libs/libs"
+        panel.title = "Choose the folder with \(platform) system libraries (*.prx)"
+        panel.message = "Built with `cmake --build build --target libs` on a \(platform) host: build/core/libs/libs"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         guard panel.runModal() == .OK, let source = panel.url else { return }
@@ -224,9 +380,6 @@ final class AppModel {
         refreshLayout()
     }
 
-    /// Symlinks the game's files into `app0/` without copying them. Module folders are
-    /// skipped: the relinker writes converted modules there, and a symlink would redirect
-    /// those writes into the original game folder.
     func linkGameResources() {
         guard let inspection, let output = outputExecutable,
               FileManager.default.fileExists(atPath: output.path) else { return }
@@ -249,6 +402,20 @@ final class AppModel {
             banner = "Linking game files failed: \(error.localizedDescription)"
         }
         refreshLayout()
+    }
+
+    func saveLog() {
+        let panel = NSSavePanel()
+        panel.title = "Save console output"
+        panel.nameFieldStringValue = "anyps5-\(ISO8601DateFormatter().string(from: Date())).log"
+            .replacingOccurrences(of: ":", with: "-")
+        panel.allowedContentTypes = [.plainText, .log]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try runner.lines.map(\.text).joined(separator: "\n").appending("\n").write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            banner = "Saving the log failed: \(error.localizedDescription)"
+        }
     }
 
     func refreshLayout() {
@@ -276,5 +443,17 @@ final class AppModel {
             appEntryCount: appEntries,
             fontsPresent: manager.fileExists(atPath: fontsDirectory.path)
         )
+    }
+
+    private func persistSettings() {
+        if let data = try? JSONEncoder().encode(settings) {
+            UserDefaults.standard.set(data, forKey: Keys.settings)
+        }
+    }
+
+    private func updateDockBadge() {
+        let active = runner.state.isRunning || isBatchRunning
+        let pending = (isBatchRunning ? queue.count : 0) + (active ? 1 : 0)
+        NSApp?.dockTile.badgeLabel = pending > 0 ? "\(pending)" : nil
     }
 }

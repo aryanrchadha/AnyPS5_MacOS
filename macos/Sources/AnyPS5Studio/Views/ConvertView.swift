@@ -26,16 +26,19 @@ struct ConvertView: View {
                     .reveal(0.12)
                 }
 
+                if !model.queue.isEmpty {
+                    QueueCard().reveal(0.1)
+                }
+
                 WeightedRow(weights: [1.2, 1]) {
                     OptionsCard().reveal(0.18)
                     OutputCard().reveal(0.24)
                 }
             }
+            .animation(Motion.settle, value: model.queue.count)
         }
     }
 }
-
-// MARK: - Source
 
 private struct SourceCard: View {
     @Environment(AppModel.self) private var model
@@ -70,7 +73,7 @@ private struct SourceCard: View {
                     .offset(y: hoveringDrop ? 3 : 0)
             }
             VStack(spacing: 8) {
-                Text("Drop a game folder or eboot.bin")
+                Text("Drop game folders or an eboot.bin")
                     .font(.sectionTitle)
                     .tracking(-0.4)
                     .foregroundStyle(Theme.textPrimary)
@@ -80,7 +83,7 @@ private struct SourceCard: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 380)
             }
-            IslandButton(title: "Choose game") { model.chooseExecutable() }
+            IslandButton(title: "Choose games") { model.chooseExecutable() }
             Spacer(minLength: 24)
         }
         .frame(maxWidth: .infinity, minHeight: 360)
@@ -177,7 +180,53 @@ private struct SourceCard: View {
     }
 }
 
-// MARK: - Target
+private struct QueueCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        BezelCard {
+            VStack(alignment: .leading, spacing: 14) {
+                CardHeader(eyebrow: "Queue", title: "\(model.queue.count) more \(model.queue.count == 1 ? "title" : "titles") waiting",
+                           trailing: AnyView(GhostButton(title: "Clear", symbol: "xmark") { model.clearQueue() }))
+                Text("Convert all runs the current title, then each queued title with the same switches and output folder. Titles that cannot be converted are skipped.")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                VStack(spacing: 0) {
+                    ForEach(model.queue, id: \.executable) { item in
+                        HStack(spacing: 12) {
+                            StatusDot(color: item.blockingIssue == nil ? Theme.success : Theme.failure)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.displayTitle)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text(item.blockingIssue ?? item.executable.deletingLastPathComponent().path)
+                                    .font(.monoSmall)
+                                    .foregroundStyle(item.blockingIssue == nil ? Theme.textTertiary : Theme.failure)
+                                    .lineLimit(1)
+                                    .truncationMode(.head)
+                            }
+                            Spacer()
+                            Button {
+                                model.removeFromQueue(item)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .frame(width: 24, height: 24)
+                                    .background(Circle().fill(Color.white.opacity(0.06)))
+                            }
+                            .buttonStyle(PressableStyle())
+                            .help("Remove from queue")
+                        }
+                        .padding(.vertical, 9)
+                        Hairline()
+                    }
+                }
+            }
+        }
+    }
+}
 
 private struct TargetCard: View {
     @Environment(AppModel.self) private var model
@@ -250,8 +299,6 @@ private struct TargetTile: View {
     }
 }
 
-// MARK: - Host
-
 private struct HostCard: View {
     @Environment(AppModel.self) private var model
 
@@ -298,8 +345,6 @@ private struct HostRow: View {
         .padding(.vertical, 9)
     }
 }
-
-// MARK: - Options
 
 private struct OptionsCard: View {
     @Environment(AppModel.self) private var model
@@ -375,8 +420,6 @@ private struct OptionsCard: View {
     }
 }
 
-// MARK: - Output
-
 private struct OutputCard: View {
     @Environment(AppModel.self) private var model
     @State var copied = false
@@ -448,6 +491,10 @@ private struct OutputCard: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     Spacer(minLength: 8)
+                    if !model.queue.isEmpty {
+                        IslandButton(title: "Convert all \(model.queue.count + 1)", symbol: "square.stack.3d.down.right",
+                                     prominent: false, enabled: model.canConvert) { model.convertAll() }
+                    }
                     IslandButton(title: model.runner.state.isRunning ? "Converting…" : "Convert",
                                  enabled: model.canConvert) { model.convert() }
                 }

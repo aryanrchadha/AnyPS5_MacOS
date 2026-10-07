@@ -24,30 +24,52 @@ struct ConsoleView: View {
 
 private struct LogCard: View {
     @Environment(AppModel.self) private var model
+    @State var filter = ""
+    @State var issuesOnly = false
+
+    private var visibleLines: [LogLine] {
+        let query = filter.trimmingCharacters(in: .whitespaces)
+        return model.runner.lines.filter { line in
+            if issuesOnly && line.tone != .failure && line.tone != .warning { return false }
+            return query.isEmpty || line.text.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
+        let lines = visibleLines
         BezelCard(padding: 0) {
             VStack(spacing: 0) {
                 HStack(spacing: 10) {
-                    Eyebrow(text: "\(model.runner.lines.count) lines")
+                    Eyebrow(text: lines.count == model.runner.lines.count
+                            ? "\(model.runner.lines.count) lines"
+                            : "\(lines.count) of \(model.runner.lines.count)")
+                    GlassField(placeholder: "Filter", text: $filter, monospaced: true)
+                        .frame(maxWidth: 220)
+                    Toggle("Issues only", isOn: $issuesOnly.animation(Motion.snap))
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .tint(Theme.accent)
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textSecondary)
                     Spacer()
                     GhostButton(title: "Copy", symbol: "doc.on.doc") {
-                        let text = model.runner.lines.map(\.text).joined(separator: "\n")
+                        let text = lines.map(\.text).joined(separator: "\n")
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(text, forType: .string)
                     }
+                    GhostButton(title: "Save", symbol: "square.and.arrow.down") { model.saveLog() }
                     GhostButton(title: "Clear", symbol: "trash") { model.runner.clear() }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
                 Hairline()
 
-                if model.runner.lines.isEmpty {
+                if lines.isEmpty {
                     VStack(spacing: 12) {
                         Image(systemName: "text.alignleft")
                             .font(.system(size: 28, weight: .ultraLight))
                             .foregroundStyle(Theme.textTertiary)
-                        Text("Nothing has run yet.")
+                        Text(model.runner.lines.isEmpty ? "Nothing has run yet." : "No lines match the filter.")
                             .font(.bodyText)
                             .foregroundStyle(Theme.textSecondary)
                     }
@@ -56,19 +78,19 @@ private struct LogCard: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(alignment: .leading, spacing: 2) {
-                                ForEach(model.runner.lines) { line in
+                                ForEach(lines) { line in
                                     LogLineView(line: line).id(line.id)
                                 }
                             }
                             .padding(20)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .onChange(of: model.runner.lines.last?.id) { _, last in
+                        .onChange(of: lines.last?.id) { _, last in
                             guard let last else { return }
                             proxy.scrollTo(last, anchor: .bottom)
                         }
                         .onAppear {
-                            if let last = model.runner.lines.last?.id { proxy.scrollTo(last, anchor: .bottom) }
+                            if let last = lines.last?.id { proxy.scrollTo(last, anchor: .bottom) }
                         }
                     }
                 }

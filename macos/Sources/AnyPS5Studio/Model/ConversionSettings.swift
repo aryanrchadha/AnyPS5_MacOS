@@ -1,7 +1,6 @@
 import Foundation
 
-/// Output format the relinker writes. Mirrors `--windows` in docs/user/USAGE.md.
-enum TargetPlatform: String, CaseIterable, Identifiable {
+enum TargetPlatform: String, CaseIterable, Identifiable, Codable {
     case windows
     case linux
 
@@ -36,8 +35,7 @@ enum TargetPlatform: String, CaseIterable, Identifiable {
     }
 }
 
-/// `unused-filter=0|1|2`.
-enum UnusedFilter: Int, CaseIterable, Identifiable {
+enum UnusedFilter: Int, CaseIterable, Identifiable, Codable {
     case keepAll = 0
     case filter = 1
     case strict = 2
@@ -61,12 +59,10 @@ enum UnusedFilter: Int, CaseIterable, Identifiable {
     }
 }
 
-struct ConversionSettings: Equatable {
+struct ConversionSettings: Equatable, Codable {
     static let defaultRunPath = "$ORIGIN/libs"
 
     var target: TargetPlatform = .windows
-    /// Apple Silicon runs x86-64 code through Rosetta 2, which implements Intel's
-    /// instruction set. AMD-only instructions (SSE4a, CLZERO, ...) must be lowered.
     var toIntel = true
     var unusedFilter: UnusedFilter = .keepAll
     var writeRegistry = false
@@ -74,7 +70,6 @@ struct ConversionSettings: Equatable {
     var windowsGUI = true
     var windowsDiagnostics = false
 
-    /// Problems that would make the relinker reject the arguments (exit code 1).
     var validationIssue: String? {
         let trimmed = runPath.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return "The library search path cannot be empty." }
@@ -108,8 +103,6 @@ struct ConversionSettings: Equatable {
         return arguments
     }
 
-    /// Directory the runtime searches for system `.prx` libraries, when it can be resolved
-    /// relative to the output executable.
     func libraryDirectory(besides executable: URL) -> URL? {
         let trimmed = runPath.trimmingCharacters(in: .whitespaces)
         let base = executable.deletingLastPathComponent()
@@ -123,7 +116,6 @@ struct ConversionSettings: Equatable {
 }
 
 extension Array where Element == String {
-    /// Shell-quoted rendering for the command preview.
     var shellCommand: String {
         map { argument in
             let safe = argument.allSatisfy { $0.isLetter || $0.isNumber || "-_./=:+,@".contains($0) }

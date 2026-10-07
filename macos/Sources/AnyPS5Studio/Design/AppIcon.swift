@@ -1,8 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// The app icon, drawn in SwiftUI so it lives in source. Two interlocked links on an OLED
-/// squircle: one executable relinked into another. Follows the macOS 1024 pt icon grid.
 struct AppIconView: View {
     var body: some View {
         let squircle = RoundedRectangle(cornerRadius: 185, style: .continuous)
@@ -42,8 +40,6 @@ struct AppIconView: View {
             link.strokeBorder(teal, lineWidth: 34)
                 .frame(width: 350, height: 230)
                 .offset(x: 87, y: 67)
-            // The white link passes over the teal one at the upper crossing: interlocked.
-            // Mask coordinates are local to the link, applied before it is moved into place.
             link.strokeBorder(white, lineWidth: 34)
                 .frame(width: 350, height: 230)
                 .mask(Rectangle().frame(width: 80, height: 90).offset(x: 158, y: 36))
@@ -61,7 +57,6 @@ enum AppIconRenderer {
         return renderer.nsImage
     }
 
-    /// `AnyPS5Studio --render-icon <path.png>` writes the 1024 px icon and exits.
     static func renderIfRequested() {
         let arguments = CommandLine.arguments
         guard let flag = arguments.firstIndex(of: "--render-icon"), flag + 1 < arguments.count else { return }

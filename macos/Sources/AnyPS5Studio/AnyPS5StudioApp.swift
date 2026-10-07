@@ -31,6 +31,9 @@ struct AnyPS5StudioApp: App {
                 Button("Convert") { model.convert() }
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(!model.canConvert)
+                Button("Convert All Queued") { model.convertAll() }
+                    .keyboardShortcut(.return, modifiers: [.command, .shift])
+                    .disabled(!model.canConvert || model.queue.isEmpty)
                 Button("Stop") { model.cancel() }
                     .keyboardShortcut(".", modifiers: .command)
                     .disabled(!model.runner.state.isRunning)
@@ -52,7 +55,6 @@ struct AnyPS5StudioApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // `swift run` starts the binary outside a bundle; make it a regular foreground app.
         NSApp.setActivationPolicy(.regular)
         if Bundle.main.object(forInfoDictionaryKey: "CFBundleIconFile") == nil {
             NSApp.applicationIconImage = MainActor.assumeIsolated { AppIconRenderer.image(scale: 0.5) }
@@ -60,5 +62,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        OpenRequests.submit(urls)
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+enum OpenRequests {
+    static let didReceive = Notification.Name("AnyPS5StudioOpenRequests")
+    private static var pending: [URL] = []
+
+    static func submit(_ urls: [URL]) {
+        pending.append(contentsOf: urls)
+        NotificationCenter.default.post(name: didReceive, object: nil)
+    }
+
+    static func drain() -> [URL] {
+        defer { pending.removeAll() }
+        return pending
+    }
 }

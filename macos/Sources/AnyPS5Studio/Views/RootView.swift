@@ -12,6 +12,7 @@ struct RootView: View {
             Group {
                 switch model.route {
                 case .convert: ConvertView()
+                case .library: LibraryView()
                 case .console: ConsoleView()
                 case .system: SystemView()
                 }
@@ -27,9 +28,9 @@ struct RootView: View {
         }
         .animation(Motion.settle, value: model.route)
         .dropDestination(for: URL.self) { urls, _ in
-            guard let url = urls.first else { return false }
+            guard !urls.isEmpty else { return false }
             withAnimation(Motion.settle) {
-                model.open(url)
+                model.open(urls)
                 model.route = .convert
             }
             return true
@@ -38,10 +39,25 @@ struct RootView: View {
             model.refreshEnvironment()
             model.reinspect()
         }
+        .onReceive(NotificationCenter.default.publisher(for: OpenRequests.didReceive)) { _ in
+            drainOpenRequests()
+        }
+        .onAppear {
+            SystemNotifier.requestAuthorization()
+            drainOpenRequests()
+        }
+    }
+
+    private func drainOpenRequests() {
+        let urls = OpenRequests.drain()
+        guard !urls.isEmpty else { return }
+        withAnimation(Motion.settle) {
+            model.open(urls)
+            model.route = .convert
+        }
     }
 }
 
-/// Floating island navigation, detached from the window edge.
 private struct TopBar: View {
     @Environment(AppModel.self) private var model
     @Namespace var namespace
@@ -117,7 +133,6 @@ private struct RunIndicator: View {
     }
 }
 
-/// Page scaffold shared by the three routes: heading block and generous margins.
 struct Page<Content: View>: View {
     let eyebrow: String
     let title: String

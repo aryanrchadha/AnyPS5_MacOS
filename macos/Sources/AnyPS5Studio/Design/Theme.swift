@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Design tokens. One dark surface family, one cold accent, status hues reserved for state.
 enum Theme {
     static let canvas = Color(red: 0.020, green: 0.020, blue: 0.024)
     static let shell = Color.white.opacity(0.035)
@@ -26,7 +25,6 @@ enum Theme {
     static var innerRadius: CGFloat { outerRadius - bezel }
 }
 
-/// Spring and curve vocabulary. Nothing animates linearly.
 enum Motion {
     static let settle = Animation.spring(response: 0.55, dampingFraction: 0.84)
     static let snap = Animation.spring(response: 0.32, dampingFraction: 0.78)

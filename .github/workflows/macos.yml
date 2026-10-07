@@ -1,0 +1,75 @@
+name: macOS
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'macos/**'
+      - 'core/relinker/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/macos.yml'
+  pull_request:
+    paths:
+      - 'macos/**'
+      - 'core/relinker/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple-silicon:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Relinker tests (arm64, native)
+        run: |
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release -DANYPS5_RELINKER_ONLY=ON -DBUILD_TESTING=ON
+          cmake --build build-tests --parallel 2>&1 | tee build-tests.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E 'error:' build-tests.log | head -20 | while IFS= read -r line; do echo "::error title=Relinker build::$line"; done
+            exit "$status"
+          fi
+          ctest --test-dir build-tests --output-on-failure --timeout 120 2>&1 | tee ctest.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            for test in $(sed -n 's/^[0-9]*:\(.*\)$/\1/p' build-tests/Testing/Temporary/LastTestsFailed.log); do
+              detail=$(ctest --test-dir build-tests -R "^${test}\$" --output-on-failure 2>&1 | grep -vE '^(Test project|      Start|Total Test time|Errors while|Output from|Use \"--rerun)' | tail -25 | python3 -c "import sys; print(sys.stdin.read().replace('%', '%25').replace('\r', '').replace('\n', '%0A'))")
+              echo "::error title=ctest ${test}::${detail}"
+            done
+          fi
+          exit "$status"
+      - name: Build AnyPS5 Studio.app
+        if: always()
+        run: |
+          DMG=1 bash macos/scripts/build-app.sh 2>&1 | tee app.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E 'error:|warning: icon|failed' app.log | head -20 | while IFS= read -r line; do echo "::error title=App build::$line"; done
+          fi
+          exit "$status"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: logs
+          path: |
+            build-tests.log
+            ctest.log
+            app.log
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: AnyPS5-Studio-macOS-arm64
+          path: build-macos/AnyPS5-Studio.dmg
+          if-no-files-found: error

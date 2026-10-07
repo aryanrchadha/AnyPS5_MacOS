@@ -29,6 +29,21 @@ add_compile_definitions(APS5_ENABLE_TIMING_LOG=$<BOOL:${APS5_ENABLE_TIMING_LOG}>
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(APPLE)
+    set(ANYPS5_RELINKER_ONLY_DEFAULT ON)
+else()
+    set(ANYPS5_RELINKER_ONLY_DEFAULT OFF)
+endif()
+option(ANYPS5_RELINKER_ONLY "Build only the relinker host tool" ${ANYPS5_RELINKER_ONLY_DEFAULT})
+
+if(ANYPS5_RELINKER_ONLY)
+    if(NOT APPLE)
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
+    endif()
+    add_subdirectory(core/relinker)
+    return()
+endif()
+
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)

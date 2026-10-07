@@ -1,10 +1,10 @@
 # About
 
-Tool for automatic executables porting to Linux and Windows.
+Tool for automatic executables porting to Linux and Windows. On macOS, [AnyPS5 Studio](docs/user/MACOS.md) runs the relinker natively on Apple Silicon.
 
 Includes a [relinker](core/relinker) that converts executable to the target system's native format and implementations of [system prx libraries](core/libs/prx) suitable for dynamic linking. No emulation or separate runtime process.
 
-[Usage](docs/user/USAGE.md), [Build instructions](docs/dev/BUILD.md), [Technical debt of the project](docs/dev/TechnicalDebt.md), [code style conventions](docs/dev/CONVENTIONS.md), [contributing](CONTRIBUTING.md)
+[Usage](docs/user/USAGE.md), [macOS and Apple Silicon](docs/user/MACOS.md), [Build instructions](docs/dev/BUILD.md), [Technical debt of the project](docs/dev/TechnicalDebt.md), [code style conventions](docs/dev/CONVENTIONS.md), [contributing](CONTRIBUTING.md)
 
 ## Status
 

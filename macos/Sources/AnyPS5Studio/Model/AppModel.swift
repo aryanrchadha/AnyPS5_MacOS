@@ -75,6 +75,10 @@ final class AppModel {
     let library = LibraryStore()
     let compatibility = CompatibilityList.load()
     let controllers = ControllerMonitor()
+    let build = BuildInfo.current
+    private(set) var updateStatus: UpdateStatus?
+    private(set) var updateError: String?
+    private(set) var checkingForUpdates = false
     @ObservationIgnored private var conversionStartLine = -1
 
     private enum Keys {
@@ -303,7 +307,8 @@ final class AppModel {
             convertedAt: Date(),
             exitCode: code,
             iconURL: inspection.iconURL,
-            report: report
+            report: report,
+            relinkerCommit: build.commit
         ))
         refreshLayout()
         batchCount += 1
@@ -650,6 +655,42 @@ final class AppModel {
         guard process.terminationStatus == 0 else {
             let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             throw TitleDataError.toolFailed("\((path as NSString).lastPathComponent) exited with \(process.terminationStatus): \(message)")
+        }
+    }
+
+    var outdatedEntries: [LibraryEntry] {
+        guard let current = build.commit else { return [] }
+        return library.entries.filter { entry in
+            guard let commit = entry.relinkerCommit else { return false }
+            return commit != current && entry.sourceExists
+        }
+    }
+
+    func isOutdated(_ entry: LibraryEntry) -> Bool {
+        guard let current = build.commit, let commit = entry.relinkerCommit else { return false }
+        return commit != current
+    }
+
+    func queueOutdated() {
+        let sources = outdatedEntries.map(\.source)
+        guard !sources.isEmpty else { return }
+        open(sources)
+        route = .convert
+        runner.note("Queued \(sources.count) titles converted with an older relinker. Convert All re-converts them with the current switches.")
+    }
+
+    func checkForUpdates() {
+        guard !checkingForUpdates else { return }
+        checkingForUpdates = true
+        updateError = nil
+        let build = self.build
+        Task { @MainActor in
+            do {
+                self.updateStatus = try await UpdateChecker.check(build)
+            } catch {
+                self.updateError = "\(error)"
+            }
+            self.checkingForUpdates = false
         }
     }
 

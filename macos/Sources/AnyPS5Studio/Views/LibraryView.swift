@@ -35,6 +35,12 @@ struct LibraryView: View {
                     Text("\(model.library.entries.count) titles")
                         .font(.captionText)
                         .foregroundStyle(Theme.textSecondary)
+                    if !model.outdatedEntries.isEmpty {
+                        GhostButton(title: "Re-convert outdated (\(model.outdatedEntries.count))", symbol: "arrow.clockwise") {
+                            model.queueOutdated()
+                        }
+                        .help("Queue titles converted with an older relinker build")
+                    }
                     GhostButton(title: "Forget missing", symbol: "trash") { model.library.removeMissing() }
                 }
                 .reveal(0.04)
@@ -110,6 +116,10 @@ private struct LibraryCard: View {
                                  symbol: entry.succeeded ? "checkmark" : "xmark",
                                  tint: entry.succeeded ? Theme.success : Theme.failure)
                             Chip(text: entry.target.title, symbol: entry.target.symbol)
+                            if model.isOutdated(entry) {
+                                Chip(text: "Older relinker", symbol: "clock.arrow.circlepath", tint: Theme.warning)
+                                    .help("Converted with relinker \(entry.relinkerCommit.map { String($0.prefix(8)) } ?? "?"); this app bundles \(model.build.shortCommit ?? "?")")
+                            }
                         }
                         .padding(.top, 2)
                     }

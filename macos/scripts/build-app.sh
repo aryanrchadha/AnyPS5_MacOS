@@ -40,6 +40,14 @@ cp "$BUILD/relinker/core/relinker/relinker" "$APP/Contents/MacOS/relinker"
 sed -e "s/__VERSION__/${VERSION#v}/" -e "s/__BUILD__/${BUILD_NUMBER}/" \
     "$MACOS/Resources/Info.plist" > "$APP/Contents/Info.plist"
 cp "$ROOT/docs/user/COMPATIBILITY.md" "$APP/Contents/Resources/COMPATIBILITY.md"
+COMMIT="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+REPOSITORY="$(git -C "$ROOT" remote get-url origin 2>/dev/null | sed -E 's#^.*github\.com[:/]##; s#\.git$##' || true)"
+if [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+    /usr/libexec/PlistBuddy -c "Add :AnyPS5Commit string $COMMIT" "$APP/Contents/Info.plist"
+fi
+if [[ "$REPOSITORY" =~ ^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$ ]]; then
+    /usr/libexec/PlistBuddy -c "Add :AnyPS5Repository string $REPOSITORY" "$APP/Contents/Info.plist"
+fi
 
 ICON_PNG="$BUILD/AppIcon.png"
 ICONSET="$BUILD/AppIcon.iconset"

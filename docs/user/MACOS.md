@@ -84,7 +84,8 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
     - The Library sorts by recent activity, title, play time or disk usage. Pinned titles stay on top.
     - *Move Conversion to Trash* removes a title's output folder, with the option to back up its saves first. It only acts on folders laid out by AnyPS5 Studio (`<name>/<name>.exe`).
     - *Export Diagnostics*, from a card or the System page, writes a text report with system details, the title's conversion report and sessions, and the console log, for bug reports. It contains file paths; review it before sharing.
-12. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window.
+12. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
+13. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window.
 
 The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed.
 

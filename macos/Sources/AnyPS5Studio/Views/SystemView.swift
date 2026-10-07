@@ -13,6 +13,7 @@ struct SystemView: View {
                     ReadinessCard().reveal(0.05)
                     PipelineCard().reveal(0.12)
                 }
+                UpdatesCard().reveal(0.14)
                 DisplayCard().reveal(0.15)
                 LimitsCard().reveal(0.18)
             }
@@ -147,6 +148,52 @@ private struct PipelineCard: View {
                 }
             }
         }
+    }
+}
+
+private struct UpdatesCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        BezelCard(padding: 26) {
+            VStack(alignment: .leading, spacing: 14) {
+                CardHeader(eyebrow: "Project updates", title: headline,
+                           trailing: AnyView(GhostButton(title: model.checkingForUpdates ? "Checking…" : "Check now",
+                                                         symbol: "arrow.triangle.2.circlepath") { model.checkForUpdates() }))
+                Text("This build: \(model.build.shortCommit ?? "commit not recorded")\(model.build.repository.map { " from \($0)" } ?? ""). Compared with \(BuildInfo.upstreamReference), where the relinker and runtime are developed.")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let error = model.updateError {
+                    Callout(text: error)
+                }
+                if let status = model.updateStatus, !status.isCurrent {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(Array(status.subjects.prefix(6).enumerated()), id: \.offset) { _, subject in
+                            Text("• " + subject)
+                                .font(.captionText)
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    HStack(spacing: 10) {
+                        if let url = status.compareURL {
+                            GhostButton(title: "View changes", symbol: "arrow.up.right.square") { NSWorkspace.shared.open(url) }
+                        }
+                        Text("Pull upstream into your fork, rebuild with build-app.sh, then re-convert titles marked Older relinker.")
+                            .font(.captionText)
+                            .foregroundStyle(Theme.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    private var headline: String {
+        guard let status = model.updateStatus else { return "Not checked yet" }
+        if status.isCurrent { return "Up to date with upstream" }
+        return "\(status.newerCommits) upstream \(status.newerCommits == 1 ? "commit" : "commits") newer than this build"
     }
 }
 

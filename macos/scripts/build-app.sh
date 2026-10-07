@@ -39,6 +39,7 @@ cp "$BIN_DIR/AnyPS5Studio" "$APP/Contents/MacOS/AnyPS5Studio"
 cp "$BUILD/relinker/core/relinker/relinker" "$APP/Contents/MacOS/relinker"
 sed -e "s/__VERSION__/${VERSION#v}/" -e "s/__BUILD__/${BUILD_NUMBER}/" \
     "$MACOS/Resources/Info.plist" > "$APP/Contents/Info.plist"
+cp "$ROOT/docs/user/COMPATIBILITY.md" "$APP/Contents/Resources/COMPATIBILITY.md"
 
 ICON_PNG="$BUILD/AppIcon.png"
 ICONSET="$BUILD/AppIcon.iconset"

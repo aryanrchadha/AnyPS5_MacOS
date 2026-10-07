@@ -4,13 +4,14 @@ import Observation
 import UniformTypeIdentifiers
 
 enum Route: String, CaseIterable, Identifiable {
-    case convert, library, console, system
+    case convert, library, controls, console, system
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .convert: "Convert"
         case .library: "Library"
+        case .controls: "Controls"
         case .console: "Console"
         case .system: "System"
         }
@@ -20,6 +21,7 @@ enum Route: String, CaseIterable, Identifiable {
         switch self {
         case .convert: "arrow.triangle.2.circlepath"
         case .library: "square.grid.2x2"
+        case .controls: "gamecontroller"
         case .console: "text.alignleft"
         case .system: "cpu"
         }
@@ -63,8 +65,15 @@ final class AppModel {
     var selectedWine: WineRuntime?
     var banner: String?
 
+    private(set) var lastReport: ConversionReport?
+    private(set) var inputConfig = InputConfig()
+    private(set) var inputConfigDirectory: URL?
+    private(set) var inputConfigSaved = true
+
     let runner = ProcessRunner()
     let library = LibraryStore()
+    let compatibility = CompatibilityList.load()
+    @ObservationIgnored private var conversionStartLine = -1
 
     private enum Keys {
         static let outputDirectory = "outputDirectory"
@@ -252,6 +261,7 @@ final class AppModel {
             return
         }
         route = .console
+        conversionStartLine = runner.lines.last?.id ?? -1
         runner.run(label: "Converting \(inspection.displayTitle)", executable: relinker, arguments: arguments,
                    workingDirectory: output.deletingLastPathComponent()) { [weak self] code in
             self?.conversionFinished(inspection, output: output, code: code)
@@ -266,6 +276,8 @@ final class AppModel {
         case 2: runner.note("\(inspection.displayTitle): conversion failed (exit code 2). The reason is printed above.")
         default: runner.note("\(inspection.displayTitle): the relinker exited with code \(code).")
         }
+        let report = ConversionReport(lines: runner.lines.filter { $0.id > conversionStartLine && $0.source != .system }.map(\.text))
+        lastReport = report
         library.record(LibraryEntry(
             title: inspection.displayTitle,
             titleId: inspection.titleId,
@@ -274,7 +286,8 @@ final class AppModel {
             target: settings.target,
             convertedAt: Date(),
             exitCode: code,
-            iconURL: inspection.iconURL
+            iconURL: inspection.iconURL,
+            report: report
         ))
         refreshLayout()
         batchCount += 1
@@ -402,6 +415,134 @@ final class AppModel {
             banner = "Linking game files failed: \(error.localizedDescription)"
         }
         refreshLayout()
+    }
+
+    var inputConfigURL: URL? {
+        inputConfigDirectory?.appendingPathComponent(InputConfig.fileName)
+    }
+
+    var controlsTargets: [LibraryEntry] {
+        var seen = Set<String>()
+        return library.entries.filter { entry in
+            entry.succeeded && entry.outputExists
+                && seen.insert(entry.output.deletingLastPathComponent().standardizedFileURL.path).inserted
+        }
+    }
+
+    func selectControlsTarget(_ directory: URL?) {
+        inputConfigDirectory = directory
+        reloadInputConfig()
+    }
+
+    func reloadInputConfig() {
+        guard let url = inputConfigURL else {
+            inputConfig = InputConfig()
+            inputConfigSaved = true
+            return
+        }
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        inputConfig = InputConfig(contents: text)
+        inputConfigSaved = true
+    }
+
+    func reloadInputConfigIfSaved() {
+        if inputConfigSaved { reloadInputConfig() }
+    }
+
+    func updateInputConfig(_ change: (inout InputConfig) throws -> Void) {
+        do {
+            var copy = inputConfig
+            try change(&copy)
+            inputConfig = copy
+            inputConfigSaved = false
+        } catch {
+            banner = "\(error)"
+        }
+    }
+
+    func saveInputConfig() {
+        guard let url = inputConfigURL else { return }
+        do {
+            let text = inputConfig.serialized
+            if text.isEmpty {
+                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            } else {
+                try text.write(to: url, atomically: true, encoding: .utf8)
+            }
+            inputConfig = InputConfig(contents: text)
+            inputConfigSaved = true
+        } catch {
+            banner = "Saving \(InputConfig.fileName) failed: \(error.localizedDescription)"
+        }
+    }
+
+    func importFonts() {
+        guard let output = outputExecutable else { return }
+        let destination = output.deletingLastPathComponent().appendingPathComponent("anyps5-fonts", isDirectory: true)
+        let panel = NSOpenPanel()
+        panel.title = "Choose font files or a folder of fonts"
+        panel.message = "Console fonts (SST-*.otf) or Noto substitutes (NotoSans-*.ttf, NotoSansCJK-*.ttc)."
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        guard panel.runModal() == .OK else { return }
+
+        let manager = FileManager.default
+        let extensions: Set<String> = ["otf", "ttf", "ttc"]
+        var fonts: [URL] = []
+        for url in panel.urls {
+            var isDirectory: ObjCBool = false
+            _ = manager.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            if isDirectory.boolValue {
+                fonts += ((try? manager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [])
+                    .filter { extensions.contains($0.pathExtension.lowercased()) }
+            } else if extensions.contains(url.pathExtension.lowercased()) {
+                fonts.append(url)
+            }
+        }
+        guard !fonts.isEmpty else {
+            banner = "No .otf, .ttf or .ttc files were selected."
+            return
+        }
+        do {
+            try manager.createDirectory(at: destination, withIntermediateDirectories: true)
+            for font in fonts {
+                let target = destination.appendingPathComponent(font.lastPathComponent)
+                if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
+                try manager.copyItem(at: font, to: target)
+            }
+            runner.note("Imported \(fonts.count) fonts into \(destination.path)")
+        } catch {
+            banner = "Importing fonts failed: \(error.localizedDescription)"
+        }
+        refreshLayout()
+    }
+
+    func createLauncher(title: String, titleId: String?, executable: URL, iconURL: URL?) {
+        guard let wine = selectedWine else {
+            banner = "Install CrossOver, Whisky or Wine to create a launcher."
+            return
+        }
+        do {
+            let app = try LauncherBuilder.build(title: title, titleId: titleId, executable: executable,
+                                                wine: wine.executable, environment: parsedWineEnvironment)
+            if let iconURL, let image = NSImage(contentsOf: iconURL) {
+                NSWorkspace.shared.setIcon(image, forFile: app.path, options: [])
+            }
+            runner.note("Created \(app.path)")
+            NSWorkspace.shared.activateFileViewerSelecting([app])
+        } catch {
+            banner = "Creating the launcher failed: \(error.localizedDescription)"
+        }
+    }
+
+    func createLauncher(for entry: LibraryEntry) {
+        createLauncher(title: entry.title, titleId: entry.titleId, executable: entry.output, iconURL: entry.iconURL)
+    }
+
+    func createLauncherForCurrent() {
+        guard let inspection, let output = outputExecutable else { return }
+        createLauncher(title: inspection.displayTitle, titleId: inspection.titleId, executable: output, iconURL: inspection.iconURL)
     }
 
     func saveLog() {

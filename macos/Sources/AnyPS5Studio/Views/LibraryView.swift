@@ -101,6 +101,12 @@ private struct LibraryCard: View {
                          : "Output no longer exists")
                         .font(.captionText)
                         .foregroundStyle(Theme.textTertiary)
+                    if let summary = reportSummary {
+                        Text(summary)
+                            .font(.captionText)
+                            .foregroundStyle(entry.succeeded ? Theme.textSecondary : Theme.failure)
+                            .lineLimit(2)
+                    }
                 }
 
                 HStack(spacing: 8) {
@@ -119,9 +125,25 @@ private struct LibraryCard: View {
             Button("Reopen") { model.reopen(entry) }
             Button("Reveal Output in Finder") { model.reveal(entry.output) }
             Button("Reveal Source in Finder") { model.reveal(entry.source) }
+            Button("Edit Controls") {
+                model.selectControlsTarget(entry.output.deletingLastPathComponent())
+                model.route = .controls
+            }
+            .disabled(!entry.outputExists)
+            Button("Add to Applications") { model.createLauncher(for: entry) }
+                .disabled(entry.target != .windows || !entry.succeeded || !entry.outputExists || model.selectedWine == nil)
             Divider()
             Button("Remove from Library", role: .destructive) { model.library.remove(entry) }
         }
+    }
+
+    private var reportSummary: String? {
+        guard let report = entry.report else { return nil }
+        if let failure = report.failure { return failure }
+        var parts = ["\(report.guestModules) guest modules"]
+        if let external = report.externalReferences { parts.append("\(external) system imports") }
+        if let total = report.intelTotal, total > 0 { parts.append("\(total) AMD-only rewrites") }
+        return parts.joined(separator: " · ")
     }
 
     private var artwork: some View {

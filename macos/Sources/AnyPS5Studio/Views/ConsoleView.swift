@@ -136,6 +136,9 @@ private struct RunCard: View {
                         .font(.captionText)
                         .foregroundStyle(Theme.textSecondary)
                 }
+                if !model.runner.state.isRunning, let report = model.lastReport, !report.isEmpty {
+                    ReportGrid(report: report)
+                }
                 HStack(spacing: 10) {
                     if model.runner.state.isRunning {
                         IslandButton(title: "Stop", symbol: "stop.fill", prominent: false) { model.cancel() }
@@ -210,6 +213,7 @@ private struct FlowButtons: View {
                 GhostButton(title: "Link game files", symbol: "link") { model.linkGameResources() }
                     .disabled(model.layout?.executableExists != true)
                     .opacity(model.layout?.executableExists == true ? 1 : 0.4)
+                GhostButton(title: "Import fonts", symbol: "textformat") { model.importFonts() }
             }
             HStack(spacing: 8) {
                 GhostButton(title: "Reveal", symbol: "folder") { model.revealOutput() }
@@ -230,6 +234,9 @@ private struct FlowButtons: View {
                                      enabled: model.layout?.isComplete == true && !model.runner.state.isRunning) {
                             model.launch()
                         }
+                        GhostButton(title: "Add to Applications", symbol: "app.badge") { model.createLauncherForCurrent() }
+                            .disabled(model.layout?.executableExists != true)
+                            .opacity(model.layout?.executableExists == true ? 1 : 0.4)
                     }
                 } else {
                     Text("Linux builds run on a Linux x86-64 host.")
@@ -239,6 +246,44 @@ private struct FlowButtons: View {
             }
         }
         .padding(.top, 4)
+    }
+}
+
+struct ReportGrid: View {
+    let report: ConversionReport
+
+    var body: some View {
+        let items = cells
+        LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
+                  alignment: .leading, spacing: 10) {
+            ForEach(items.indices, id: \.self) { index in
+                let (label, value) = items[index]
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(value)
+                        .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(label)
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            }
+        }
+        if let failure = report.failure {
+            Callout(text: failure, tint: Theme.failure, symbol: "xmark.octagon")
+        }
+    }
+
+    private var cells: [(String, String)] {
+        var result: [(String, String)] = []
+        if let target = report.target { result.append(("Target", target)) }
+        result.append(("Guest modules", "\(report.guestModules)"))
+        if let external = report.externalReferences { result.append(("System imports", "\(external)")) }
+        if let before = report.nidBefore, let after = report.nidAfter { result.append(("NID references", before == after ? "\(after)" : "\(before) → \(after)")) }
+        if let total = report.intelTotal {
+            result.append(("AMD-only rewrites", total == 0 ? "None" : "\(report.intelInPlace ?? 0) + \(report.intelStubs ?? 0) stubs"))
+        }
+        if report.warnings > 0 { result.append(("Warnings", "\(report.warnings)")) }
+        return result
     }
 }
 

@@ -52,6 +52,16 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - *Link game files* symlinks the game's resources into `app0/` without copying. Module folders are skipped, because the relinker writes converted modules there.
 6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,).
 
+7. **Controls.** Edits [`anyps5-input.ini`](INPUT_MAPPING.md) beside a converted title.
+   - Every action shows its current keyboard and mouse bindings, with the built-in defaults until changed.
+   - *Key* records the next key press, modifier keys included. Mouse buttons and wheel directions come from the mouse menu.
+   - The same rules as the runtime apply: `ToggleFullscreen` accepts keys only, the wheel maps only to pad buttons, and `#` and `;` cannot be bound because they start comments.
+   - A binding shared by two actions is outlined in amber.
+   - Lines the runtime would reject are listed before saving. Saving with no changes from the defaults removes the file.
+8. **Add to Applications.** Creates `~/Applications/AnyPS5/<Title>.app` for Windows output. It launches the title through the selected Wine runtime with the Settings environment, and uses the game's icon. Rebuild it after changing the runtime or the environment.
+
+Each conversion also produces a report (target, guest modules, system imports, NID references, AMD-only rewrites, and the failure reason if any). It appears in the Console and on Library cards. *Import fonts* copies `.otf`, `.ttf` and `.ttc` files into `anyps5-fonts/` (see [System fonts](USAGE.md#system-fonts)). When a title ID appears in [`COMPATIBILITY.md`](COMPATIBILITY.md), its tested status is shown on the Convert page.
+
 When the app is in the background, it posts a notification when a conversion or batch finishes, and the Dock icon shows how many titles remain.
 
 The System page lists the chip, macOS version, Rosetta and Wine status, and the known gaps above.

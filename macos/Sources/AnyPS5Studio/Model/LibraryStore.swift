@@ -11,6 +11,7 @@ struct LibraryEntry: Codable, Identifiable, Equatable {
     var convertedAt: Date
     var exitCode: Int32
     var iconURL: URL?
+    var report: ConversionReport?
 
     var succeeded: Bool { exitCode == 0 }
     var outputExists: Bool { FileManager.default.fileExists(atPath: output.path) }

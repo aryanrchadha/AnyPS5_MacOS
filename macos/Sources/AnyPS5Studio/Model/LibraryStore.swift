@@ -14,6 +14,7 @@ struct LibraryEntry: Codable, Identifiable, Equatable {
     var report: ConversionReport?
     var profile: LaunchProfile?
     var sessions: [PlaySession]?
+    var relinkerCommit: String?
 
     var succeeded: Bool { exitCode == 0 }
     var outputExists: Bool { FileManager.default.fileExists(atPath: output.path) }

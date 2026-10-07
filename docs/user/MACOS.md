@@ -77,6 +77,18 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 
    The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
 
+10. **Title data.** *Data* on a Library card manages the title's runtime files:
+    - **Save data:** the runtime keeps saves in `_sd/` beside the executable, because guest paths resolve against the working directory. *Back up* writes a zip to `Documents/AnyPS5 Saves/<Title>/`. *Restore* backs up the current saves first, then replaces them.
+    - **Owned add-ons:** edits `anyps5-entitlements.ini`, the entitlement labels of add-ons you own, which the runtime reports as installed. Labels are up to 15 characters; `#` and `;` start comments.
+11. **Organise and clean up.**
+    - The Library sorts by recent activity, title, play time or disk usage. Pinned titles stay on top.
+    - *Move Conversion to Trash* removes a title's output folder, with the option to back up its saves first. It only acts on folders laid out by AnyPS5 Studio (`<name>/<name>.exe`).
+    - *Export Diagnostics*, from a card or the System page, writes a text report with system details, the title's conversion report and sessions, and the console log, for bug reports. It contains file paths; review it before sharing.
+12. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
+13. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window.
+
+The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed.
+
 Each conversion also produces a report (target, guest modules, system imports, NID references, AMD-only rewrites, and the failure reason if any). It appears in the Console and on Library cards. *Import fonts* copies `.otf`, `.ttf` and `.ttc` files into `anyps5-fonts/` (see [System fonts](USAGE.md#system-fonts)). When a title ID appears in [`COMPATIBILITY.md`](COMPATIBILITY.md), its tested status is shown on the Convert page.
 
 When the app is in the background, it posts a notification when a conversion or batch finishes, and the Dock icon shows how many titles remain.

@@ -1,16 +1,24 @@
 import AppKit
 import SwiftUI
 
+private func measureSizes(_ entries: [LibraryEntry]) async -> [String: Int64] {
+    await Task.detached(priority: .utility) {
+        var result: [String: Int64] = [:]
+        for entry in entries where entry.outputExists {
+            result[LibraryOrganizer.key(entry)] = LibraryOrganizer.folderSize(entry.output.deletingLastPathComponent())
+        }
+        return result
+    }.value
+}
+
 struct LibraryView: View {
     @Environment(AppModel.self) private var model
     @State var search = ""
+    @State var sort: LibrarySort = .recent
+    @State var sizes: [String: Int64] = [:]
 
     private var entries: [LibraryEntry] {
-        let query = search.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return model.library.entries }
-        return model.library.entries.filter {
-            $0.title.localizedCaseInsensitiveContains(query) || ($0.titleId ?? "").localizedCaseInsensitiveContains(query)
-        }
+        LibraryOrganizer.arrange(model.library.entries, query: search, sort: sort, favorites: model.favorites, sizes: sizes)
     }
 
     var body: some View {
@@ -20,11 +28,19 @@ struct LibraryView: View {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 12) {
                     GlassField(placeholder: "Search by title or title ID", text: $search)
+                        .frame(maxWidth: 320)
+                    GlassSegmented(options: LibrarySort.allCases, selection: $sort) { $0.title }
                         .frame(maxWidth: 360)
                     Spacer()
                     Text("\(model.library.entries.count) titles")
                         .font(.captionText)
                         .foregroundStyle(Theme.textSecondary)
+                    if !model.outdatedEntries.isEmpty {
+                        GhostButton(title: "Re-convert outdated (\(model.outdatedEntries.count))", symbol: "arrow.clockwise") {
+                            model.queueOutdated()
+                        }
+                        .help("Queue titles converted with an older relinker build")
+                    }
                     GhostButton(title: "Forget missing", symbol: "trash") { model.library.removeMissing() }
                 }
                 .reveal(0.04)
@@ -51,12 +67,16 @@ struct LibraryView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 420), spacing: 20, alignment: .top)],
                               alignment: .leading, spacing: 20) {
                         ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                            LibraryCard(entry: entry)
+                            LibraryCard(entry: entry, size: sizes[LibraryOrganizer.key(entry)])
                                 .reveal(0.06 + Double(min(index, 8)) * 0.04)
                         }
                     }
                 }
             }
+        }
+        .animation(Motion.settle, value: entries.map(\.id))
+        .task(id: model.library.entries.map(\.id)) {
+            sizes = await measureSizes(model.library.entries)
         }
     }
 }
@@ -64,6 +84,7 @@ struct LibraryView: View {
 private struct LibraryCard: View {
     @Environment(AppModel.self) private var model
     let entry: LibraryEntry
+    let size: Int64?
 
     var body: some View {
         BezelCard(padding: 18) {
@@ -71,10 +92,22 @@ private struct LibraryCard: View {
                 HStack(alignment: .top, spacing: 14) {
                     artwork
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(entry.title)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                            .lineLimit(2)
+                        HStack(alignment: .top, spacing: 6) {
+                            Text(entry.title)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Theme.textPrimary)
+                                .lineLimit(2)
+                            Spacer(minLength: 0)
+                            Button {
+                                withAnimation(Motion.snap) { model.toggleFavorite(entry) }
+                            } label: {
+                                Image(systemName: model.isFavorite(entry) ? "star.fill" : "star")
+                                    .font(.system(size: 12, weight: .light))
+                                    .foregroundStyle(model.isFavorite(entry) ? Theme.warning : Theme.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                            .help(model.isFavorite(entry) ? "Unpin" : "Pin to the top")
+                        }
                         Text(entry.titleId ?? entry.source.deletingLastPathComponent().lastPathComponent)
                             .font(.monoSmall)
                             .foregroundStyle(Theme.textTertiary)
@@ -83,6 +116,10 @@ private struct LibraryCard: View {
                                  symbol: entry.succeeded ? "checkmark" : "xmark",
                                  tint: entry.succeeded ? Theme.success : Theme.failure)
                             Chip(text: entry.target.title, symbol: entry.target.symbol)
+                            if model.isOutdated(entry) {
+                                Chip(text: "Older relinker", symbol: "clock.arrow.circlepath", tint: Theme.warning)
+                                    .help("Converted with relinker \(entry.relinkerCommit.map { String($0.prefix(8)) } ?? "?"); this app bundles \(model.build.shortCommit ?? "?")")
+                            }
                         }
                         .padding(.top, 2)
                     }
@@ -98,6 +135,7 @@ private struct LibraryCard: View {
                         .textSelection(.enabled)
                     Text(entry.outputExists
                          ? entry.convertedAt.formatted(date: .abbreviated, time: .shortened)
+                             + (size.map { " · " + ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "")
                          : "Output no longer exists")
                         .font(.captionText)
                         .foregroundStyle(Theme.textTertiary)
@@ -120,6 +158,7 @@ private struct LibraryCard: View {
                     GhostButton(title: "Reveal", symbol: "folder") { model.reveal(entry.output) }
                     if entry.succeeded && entry.outputExists {
                         LaunchOptionsButton(output: entry.output)
+                        TitleDataButton(entry: entry)
                     }
                     Spacer(minLength: 0)
                     if entry.target == .windows && entry.succeeded && entry.outputExists && !model.system.wineRuntimes.isEmpty {
@@ -141,8 +180,12 @@ private struct LibraryCard: View {
             .disabled(!entry.outputExists)
             Button("Add to Applications") { model.createLauncher(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded || !entry.outputExists || model.selectedWine == nil)
+            Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
+            Button("Export Diagnostics…") { model.exportDiagnostics(for: entry) }
             Divider()
             Button("Remove from Library", role: .destructive) { model.library.remove(entry) }
+            Button("Move Conversion to Trash…", role: .destructive) { model.moveToTrash(entry) }
+                .disabled(!entry.outputExists)
         }
     }
 

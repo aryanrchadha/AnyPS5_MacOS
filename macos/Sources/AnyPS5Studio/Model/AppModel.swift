@@ -66,6 +66,7 @@ final class AppModel {
     var banner: String?
 
     private(set) var lastReport: ConversionReport?
+    private(set) var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: Keys.favorites) ?? [])
     private(set) var inputConfig = InputConfig()
     private(set) var inputConfigDirectory: URL?
     private(set) var inputConfigSaved = true
@@ -73,12 +74,18 @@ final class AppModel {
     let runner = ProcessRunner()
     let library = LibraryStore()
     let compatibility = CompatibilityList.load()
+    let controllers = ControllerMonitor()
+    let build = BuildInfo.current
+    private(set) var updateStatus: UpdateStatus?
+    private(set) var updateError: String?
+    private(set) var checkingForUpdates = false
     @ObservationIgnored private var conversionStartLine = -1
 
     private enum Keys {
         static let outputDirectory = "outputDirectory"
         static let settings = "conversionSettings"
         static let wineEnvironment = "wineEnvironment"
+        static let favorites = "libraryFavorites"
     }
 
     init() {
@@ -300,7 +307,8 @@ final class AppModel {
             convertedAt: Date(),
             exitCode: code,
             iconURL: inspection.iconURL,
-            report: report
+            report: report,
+            relinkerCommit: build.commit
         ))
         refreshLayout()
         batchCount += 1
@@ -565,6 +573,209 @@ final class AppModel {
     func createLauncherForCurrent() {
         guard let inspection, let output = outputExecutable else { return }
         createLauncher(title: inspection.displayTitle, titleId: inspection.titleId, executable: output, iconURL: inspection.iconURL)
+    }
+
+    func saveBackups(title: String, titleId: String?) -> [SaveBackup] {
+        SaveData.backups(in: SaveData.backupFolder(title: title, titleId: titleId))
+    }
+
+    @discardableResult
+    func backupSaves(output: URL, title: String, titleId: String?, quiet: Bool = false) -> URL? {
+        let source = SaveData.directory(besides: output)
+        guard SaveData.hasSaves(at: source) else {
+            if !quiet { banner = "\(title) has no save data yet." }
+            return nil
+        }
+        let folder = SaveData.backupFolder(title: title, titleId: titleId)
+        let archive = folder.appendingPathComponent(SaveData.backupName(for: Date()))
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try runTool("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", source.path, archive.path])
+            runner.note("Backed up \(title) saves to \(archive.path)")
+            return archive
+        } catch {
+            banner = "Backing up saves failed: \(error)"
+            return nil
+        }
+    }
+
+    func restoreSaves(_ backup: SaveBackup, output: URL, title: String, titleId: String?) {
+        let alert = NSAlert()
+        alert.messageText = "Restore saves from \(backup.url.deletingPathExtension().lastPathComponent)?"
+        alert.informativeText = "The current save data of \(title) is backed up first, then replaced."
+        alert.addButton(withTitle: "Restore")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let destination = SaveData.directory(besides: output)
+        if SaveData.hasSaves(at: destination), backupSaves(output: output, title: title, titleId: titleId, quiet: true) == nil { return }
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
+            try runTool("/usr/bin/ditto", ["-x", "-k", backup.url.path, output.deletingLastPathComponent().path])
+            guard FileManager.default.fileExists(atPath: destination.path) else {
+                throw TitleDataError.invalid("The backup does not contain a \(SaveData.folderName) folder.")
+            }
+            runner.note("Restored \(title) saves from \(backup.url.path)")
+        } catch {
+            banner = "Restoring saves failed: \(error)"
+        }
+    }
+
+    func entitlementsURL(for output: URL) -> URL {
+        output.deletingLastPathComponent().appendingPathComponent(EntitlementsFile.fileName)
+    }
+
+    func loadEntitlements(for output: URL) -> EntitlementsFile {
+        let text = (try? String(contentsOf: entitlementsURL(for: output), encoding: .utf8)) ?? ""
+        return EntitlementsFile(contents: text)
+    }
+
+    func saveEntitlements(_ file: EntitlementsFile, for output: URL) {
+        let url = entitlementsURL(for: output)
+        do {
+            if file.labels.isEmpty {
+                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            } else {
+                try file.serialized.write(to: url, atomically: true, encoding: .utf8)
+            }
+        } catch {
+            banner = "Saving \(EntitlementsFile.fileName) failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func runTool(_ path: String, _ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        let errors = Pipe()
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            throw TitleDataError.toolFailed("\((path as NSString).lastPathComponent) exited with \(process.terminationStatus): \(message)")
+        }
+    }
+
+    var outdatedEntries: [LibraryEntry] {
+        guard let current = build.commit else { return [] }
+        return library.entries.filter { entry in
+            guard let commit = entry.relinkerCommit else { return false }
+            return commit != current && entry.sourceExists
+        }
+    }
+
+    func isOutdated(_ entry: LibraryEntry) -> Bool {
+        guard let current = build.commit, let commit = entry.relinkerCommit else { return false }
+        return commit != current
+    }
+
+    func queueOutdated() {
+        let sources = outdatedEntries.map(\.source)
+        guard !sources.isEmpty else { return }
+        open(sources)
+        route = .convert
+        runner.note("Queued \(sources.count) titles converted with an older relinker. Convert All re-converts them with the current switches.")
+    }
+
+    func checkForUpdates() {
+        guard !checkingForUpdates else { return }
+        checkingForUpdates = true
+        updateError = nil
+        let build = self.build
+        Task { @MainActor in
+            do {
+                self.updateStatus = try await UpdateChecker.check(build)
+            } catch {
+                self.updateError = "\(error)"
+            }
+            self.checkingForUpdates = false
+        }
+    }
+
+    var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        guard let version = info?["CFBundleShortVersionString"] as? String else { return "development build" }
+        return "\(version) (\(info?["CFBundleVersion"] as? String ?? "?"))"
+    }
+
+    func isFavorite(_ entry: LibraryEntry) -> Bool {
+        favorites.contains(LibraryOrganizer.key(entry))
+    }
+
+    func toggleFavorite(_ entry: LibraryEntry) {
+        let key = LibraryOrganizer.key(entry)
+        if favorites.contains(key) { favorites.remove(key) } else { favorites.insert(key) }
+        UserDefaults.standard.set(Array(favorites), forKey: Keys.favorites)
+    }
+
+    func moveToTrash(_ entry: LibraryEntry) {
+        let folder = entry.output.deletingLastPathComponent()
+        guard folder.lastPathComponent == entry.output.deletingPathExtension().lastPathComponent,
+              FileManager.default.fileExists(atPath: entry.output.path) else {
+            banner = "\(folder.path) was not created by AnyPS5 Studio, so it is not moved to the Trash. Remove it in Finder."
+            return
+        }
+        let hasSaves = SaveData.hasSaves(at: SaveData.directory(besides: entry.output))
+        let alert = NSAlert()
+        alert.messageText = "Move \(entry.title) to the Trash?"
+        alert.informativeText = "This moves \(folder.path) to the Trash, including converted modules, libraries and shader cache."
+            + (hasSaves ? " The folder contains save data." : "")
+        if hasSaves { alert.addButton(withTitle: "Back Up Saves and Move") }
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Cancel")
+        let response = alert.runModal()
+        let backUp = hasSaves && response == .alertFirstButtonReturn
+        let move = backUp || response == (hasSaves ? .alertSecondButtonReturn : .alertFirstButtonReturn)
+        guard move else { return }
+        if backUp, backupSaves(output: entry.output, title: entry.title, titleId: entry.titleId, quiet: true) == nil {
+            banner = "Backing up the saves failed, so nothing was moved."
+            return
+        }
+        NSWorkspace.shared.recycle([folder]) { [weak self] _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    self.banner = "Moving to the Trash failed: \(error.localizedDescription)"
+                } else {
+                    self.library.remove(entry)
+                    self.runner.note("Moved \(folder.path) to the Trash")
+                    self.refreshLayout()
+                }
+            }
+        }
+    }
+
+    func exportDiagnostics(for entry: LibraryEntry?) {
+        var system: [(String, String)] = [
+            ("Chip", self.system.chip),
+            ("Architecture", self.system.isAppleSilicon ? "Apple Silicon" : "Intel"),
+            ("macOS", self.system.macOSLabel),
+            ("Memory", self.system.memoryLabel),
+            ("Rosetta 2", self.system.rosettaInstalled ? "installed" : "not installed"),
+            ("Relinker", relinker?.path ?? "not found"),
+            ("Wine runtimes", self.system.wineRuntimes.map { "\($0.name) (\($0.executable.path))" }.joined(separator: ", ")),
+        ]
+        if let gpu = DisplayProbe.gpu() {
+            system.append(("GPU", "\(gpu.name), working set \(ByteCountFormatter.string(fromByteCount: Int64(gpu.recommendedWorkingSetBytes), countStyle: .memory))"))
+        }
+        for display in DisplayProbe.displays() {
+            system.append(("Display", "\(display.name) \(display.pixelWidth)x\(display.pixelHeight) \(display.maximumRefreshRate) Hz"))
+        }
+        let report = DiagnosticsReport(appVersion: appVersion, system: system, entry: entry, log: runner.lines.map(\.text))
+        let panel = NSSavePanel()
+        panel.title = "Export diagnostics"
+        panel.message = "The report contains file paths, hardware details and the console log. Review it before sharing."
+        panel.nameFieldStringValue = "AnyPS5 diagnostics\(entry.map { " - \(LauncherBuilder.bundleName(for: $0.title))" } ?? "").txt"
+        panel.allowedContentTypes = [.plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try report.text.write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            banner = "Exporting diagnostics failed: \(error.localizedDescription)"
+        }
     }
 
     func saveLog() {

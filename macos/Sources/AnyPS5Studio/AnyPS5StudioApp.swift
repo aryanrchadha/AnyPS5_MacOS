@@ -50,6 +50,11 @@ struct AnyPS5StudioApp: App {
                 .environment(model)
                 .preferredColorScheme(.dark)
         }
+
+        MenuBarExtra("AnyPS5 Studio", systemImage: "gamecontroller") {
+            MenuBarContent()
+                .environment(model)
+        }
     }
 }
 

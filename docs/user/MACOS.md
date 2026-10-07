@@ -73,9 +73,10 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 9. **Launch options.** *Options* on a Library card, or beside Launch in the Console, sets per-title settings applied over the Settings environment:
    - the Metal Performance HUD (`MTL_HUD_ENABLED=1`), an on-screen frame rate and frame time overlay drawn by macOS;
    - disabling the shader cache (`ANYPS5_NO_SHADER_CACHE=1`);
-   - extra variables.
+   - extra variables;
+   - backing up saves on launch: before each launch from Studio, `_sd/` is archived as an `Auto` backup in `Documents/AnyPS5 Saves/<Title>/`. The newest 5 automatic backups are kept; manual backups are never removed.
 
-   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
+   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same environment settings but do not back up saves.
 
 10. **Title data.** *Data* on a Library card manages the title's runtime files:
     - **Save data:** the runtime keeps saves in `_sd/` beside the executable, because guest paths resolve against the working directory. *Back up* writes a zip to `Documents/AnyPS5 Saves/<Title>/`. *Restore* backs up the current saves first, then replaces them.

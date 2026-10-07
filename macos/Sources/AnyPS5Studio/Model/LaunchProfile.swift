@@ -4,6 +4,22 @@ struct LaunchProfile: Codable, Equatable {
     var metalHUD = false
     var disableShaderCache = false
     var extraEnvironment = ""
+    var backupSavesOnLaunch = false
+
+    init(metalHUD: Bool = false, disableShaderCache: Bool = false, extraEnvironment: String = "", backupSavesOnLaunch: Bool = false) {
+        self.metalHUD = metalHUD
+        self.disableShaderCache = disableShaderCache
+        self.extraEnvironment = extraEnvironment
+        self.backupSavesOnLaunch = backupSavesOnLaunch
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        metalHUD = try container.decodeIfPresent(Bool.self, forKey: .metalHUD) ?? false
+        disableShaderCache = try container.decodeIfPresent(Bool.self, forKey: .disableShaderCache) ?? false
+        extraEnvironment = try container.decodeIfPresent(String.self, forKey: .extraEnvironment) ?? ""
+        backupSavesOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .backupSavesOnLaunch) ?? false
+    }
 
     var environment: [String: String] {
         var result = EnvironmentText.parse(extraEnvironment)

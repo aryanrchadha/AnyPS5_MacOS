@@ -66,6 +66,8 @@ struct SaveBackup: Identifiable, Equatable {
 
 enum SaveData {
     static let folderName = "_sd"
+    static let automaticPrefix = "Auto"
+    static let automaticRetention = 5
 
     static func directory(besides executable: URL) -> URL {
         executable.deletingLastPathComponent().appendingPathComponent(folderName, isDirectory: true)
@@ -82,12 +84,20 @@ enum SaveData {
         return root.appendingPathComponent(base, isDirectory: true)
     }
 
-    static func backupName(for date: Date) -> String {
+    static func backupName(for date: Date, automatic: Bool = false) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = TimeZone.current
         formatter.dateFormat = "yyyy-MM-dd HH.mm.ss"
-        return "Saves \(formatter.string(from: date)).zip"
+        return "\(automatic ? automaticPrefix : "Saves") \(formatter.string(from: date)).zip"
+    }
+
+    static func isAutomatic(_ backup: SaveBackup) -> Bool {
+        backup.url.lastPathComponent.hasPrefix(automaticPrefix + " ")
+    }
+
+    static func expiredAutomaticBackups(in backups: [SaveBackup], keeping count: Int = automaticRetention) -> [SaveBackup] {
+        Array(backups.filter(isAutomatic).sorted { $0.url.lastPathComponent > $1.url.lastPathComponent }.dropFirst(max(count, 0)))
     }
 
     static func backups(in folder: URL) -> [SaveBackup] {

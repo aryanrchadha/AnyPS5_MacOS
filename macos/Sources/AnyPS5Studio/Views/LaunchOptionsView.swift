@@ -31,6 +31,11 @@ struct LaunchOptionsPanel: View {
                           flag: "ANYPS5_NO_SHADER_CACHE=1",
                           isOn: $profile.disableShaderCache)
                 Hairline()
+                OptionRow(title: "Back up saves on launch",
+                          detail: "Archive the save folder before each launch. The newest \(SaveData.automaticRetention) automatic backups are kept.",
+                          flag: "\(SaveData.folderName) → Documents/AnyPS5 Saves",
+                          isOn: $profile.backupSavesOnLaunch)
+                Hairline()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Extra environment")
                         .font(.system(size: 13, weight: .medium))

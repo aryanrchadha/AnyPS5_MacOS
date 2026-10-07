@@ -48,12 +48,17 @@ struct TitleDataPanel: View {
                     VStack(spacing: 0) {
                         ForEach(backups.prefix(5)) { backup in
                             HStack {
-                                Image(systemName: "archivebox")
+                                Image(systemName: SaveData.isAutomatic(backup) ? "clock.arrow.circlepath" : "archivebox")
                                     .font(.system(size: 11, weight: .light))
                                     .foregroundStyle(Theme.textTertiary)
                                 Text(backup.created.formatted(date: .abbreviated, time: .shortened))
                                     .font(.captionText)
                                     .foregroundStyle(Theme.textPrimary)
+                                if SaveData.isAutomatic(backup) {
+                                    Text("Auto")
+                                        .font(.captionText)
+                                        .foregroundStyle(Theme.textTertiary)
+                                }
                                 Text(ByteCountFormatter.string(fromByteCount: backup.bytes, countStyle: .file))
                                     .font(.captionText)
                                     .foregroundStyle(Theme.textTertiary)

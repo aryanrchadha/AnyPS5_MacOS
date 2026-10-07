@@ -364,6 +364,9 @@ final class AppModel {
     private func launch(output: URL, target: TargetPlatform) {
         guard target == .windows, let wine = selectedWine else { return }
         route = .console
+        if let entry = library.entry(for: output), entry.launchProfile.backupSavesOnLaunch {
+            backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
+        }
         let environment = launchEnvironment(for: output)
         let overrides = environment.keys.sorted().map { "\($0)=\(environment[$0] ?? "")" }.joined(separator: " ")
         if !overrides.isEmpty { runner.note("Environment: \(overrides)") }
@@ -580,18 +583,23 @@ final class AppModel {
     }
 
     @discardableResult
-    func backupSaves(output: URL, title: String, titleId: String?, quiet: Bool = false) -> URL? {
+    func backupSaves(output: URL, title: String, titleId: String?, quiet: Bool = false, automatic: Bool = false) -> URL? {
         let source = SaveData.directory(besides: output)
         guard SaveData.hasSaves(at: source) else {
             if !quiet { banner = "\(title) has no save data yet." }
             return nil
         }
         let folder = SaveData.backupFolder(title: title, titleId: titleId)
-        let archive = folder.appendingPathComponent(SaveData.backupName(for: Date()))
+        let archive = folder.appendingPathComponent(SaveData.backupName(for: Date(), automatic: automatic))
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             try runTool("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", source.path, archive.path])
             runner.note("Backed up \(title) saves to \(archive.path)")
+            if automatic {
+                for expired in SaveData.expiredAutomaticBackups(in: SaveData.backups(in: folder)) {
+                    try? FileManager.default.removeItem(at: expired.url)
+                }
+            }
             return archive
         } catch {
             banner = "Backing up saves failed: \(error)"

@@ -66,6 +66,7 @@ final class AppModel {
     var banner: String?
 
     private(set) var lastReport: ConversionReport?
+    private(set) var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: Keys.favorites) ?? [])
     private(set) var inputConfig = InputConfig()
     private(set) var inputConfigDirectory: URL?
     private(set) var inputConfigSaved = true
@@ -80,6 +81,7 @@ final class AppModel {
         static let outputDirectory = "outputDirectory"
         static let settings = "conversionSettings"
         static let wineEnvironment = "wineEnvironment"
+        static let favorites = "libraryFavorites"
     }
 
     init() {
@@ -648,6 +650,90 @@ final class AppModel {
         guard process.terminationStatus == 0 else {
             let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             throw TitleDataError.toolFailed("\((path as NSString).lastPathComponent) exited with \(process.terminationStatus): \(message)")
+        }
+    }
+
+    var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        guard let version = info?["CFBundleShortVersionString"] as? String else { return "development build" }
+        return "\(version) (\(info?["CFBundleVersion"] as? String ?? "?"))"
+    }
+
+    func isFavorite(_ entry: LibraryEntry) -> Bool {
+        favorites.contains(LibraryOrganizer.key(entry))
+    }
+
+    func toggleFavorite(_ entry: LibraryEntry) {
+        let key = LibraryOrganizer.key(entry)
+        if favorites.contains(key) { favorites.remove(key) } else { favorites.insert(key) }
+        UserDefaults.standard.set(Array(favorites), forKey: Keys.favorites)
+    }
+
+    func moveToTrash(_ entry: LibraryEntry) {
+        let folder = entry.output.deletingLastPathComponent()
+        guard folder.lastPathComponent == entry.output.deletingPathExtension().lastPathComponent,
+              FileManager.default.fileExists(atPath: entry.output.path) else {
+            banner = "\(folder.path) was not created by AnyPS5 Studio, so it is not moved to the Trash. Remove it in Finder."
+            return
+        }
+        let hasSaves = SaveData.hasSaves(at: SaveData.directory(besides: entry.output))
+        let alert = NSAlert()
+        alert.messageText = "Move \(entry.title) to the Trash?"
+        alert.informativeText = "This moves \(folder.path) to the Trash, including converted modules, libraries and shader cache."
+            + (hasSaves ? " The folder contains save data." : "")
+        if hasSaves { alert.addButton(withTitle: "Back Up Saves and Move") }
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Cancel")
+        let response = alert.runModal()
+        let backUp = hasSaves && response == .alertFirstButtonReturn
+        let move = backUp || response == (hasSaves ? .alertSecondButtonReturn : .alertFirstButtonReturn)
+        guard move else { return }
+        if backUp, backupSaves(output: entry.output, title: entry.title, titleId: entry.titleId, quiet: true) == nil {
+            banner = "Backing up the saves failed, so nothing was moved."
+            return
+        }
+        NSWorkspace.shared.recycle([folder]) { [weak self] _, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    self.banner = "Moving to the Trash failed: \(error.localizedDescription)"
+                } else {
+                    self.library.remove(entry)
+                    self.runner.note("Moved \(folder.path) to the Trash")
+                    self.refreshLayout()
+                }
+            }
+        }
+    }
+
+    func exportDiagnostics(for entry: LibraryEntry?) {
+        var system: [(String, String)] = [
+            ("Chip", self.system.chip),
+            ("Architecture", self.system.isAppleSilicon ? "Apple Silicon" : "Intel"),
+            ("macOS", self.system.macOSLabel),
+            ("Memory", self.system.memoryLabel),
+            ("Rosetta 2", self.system.rosettaInstalled ? "installed" : "not installed"),
+            ("Relinker", relinker?.path ?? "not found"),
+            ("Wine runtimes", self.system.wineRuntimes.map { "\($0.name) (\($0.executable.path))" }.joined(separator: ", ")),
+        ]
+        if let gpu = DisplayProbe.gpu() {
+            system.append(("GPU", "\(gpu.name), working set \(ByteCountFormatter.string(fromByteCount: Int64(gpu.recommendedWorkingSetBytes), countStyle: .memory))"))
+        }
+        for display in DisplayProbe.displays() {
+            system.append(("Display", "\(display.name) \(display.pixelWidth)x\(display.pixelHeight) \(display.maximumRefreshRate) Hz"))
+        }
+        let report = DiagnosticsReport(appVersion: appVersion, system: system, entry: entry, log: runner.lines.map(\.text))
+        let panel = NSSavePanel()
+        panel.title = "Export diagnostics"
+        panel.message = "The report contains file paths, hardware details and the console log. Review it before sharing."
+        panel.nameFieldStringValue = "AnyPS5 diagnostics\(entry.map { " - \(LauncherBuilder.bundleName(for: $0.title))" } ?? "").txt"
+        panel.allowedContentTypes = [.plainText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try report.text.write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            banner = "Exporting diagnostics failed: \(error.localizedDescription)"
         }
     }
 

@@ -28,8 +28,15 @@ private struct ReadinessCard: View {
         BezelCard {
             VStack(alignment: .leading, spacing: 16) {
                 CardHeader(eyebrow: "Readiness", title: "Checks",
-                           trailing: AnyView(GhostButton(title: "Refresh", symbol: "arrow.clockwise") { model.refreshEnvironment() }))
+                           trailing: AnyView(HStack(spacing: 8) {
+                               GhostButton(title: "Diagnostics", symbol: "doc.text.magnifyingglass") { model.exportDiagnostics(for: nil) }
+                               GhostButton(title: "Refresh", symbol: "arrow.clockwise") { model.refreshEnvironment() }
+                           }))
                 VStack(spacing: 0) {
+                    ReadinessRow(title: "AnyPS5 Studio",
+                                 detail: model.appVersion,
+                                 state: .ok)
+                    Hairline()
                     ReadinessRow(title: "Relinker",
                                  detail: model.relinker?.path ?? "Not found. Build it with macos/scripts/build-app.sh or set it in Settings.",
                                  state: model.relinker == nil ? .missing : .ok)

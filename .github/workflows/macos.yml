@@ -7,12 +7,14 @@ on:
       - 'macos/**'
       - 'core/relinker/**'
       - 'CMakeLists.txt'
+      - 'docs/user/COMPATIBILITY.md'
       - '.github/workflows/macos.yml'
   pull_request:
     paths:
       - 'macos/**'
       - 'core/relinker/**'
       - 'CMakeLists.txt'
+      - 'docs/user/COMPATIBILITY.md'
       - '.github/workflows/macos.yml'
   workflow_dispatch:
 

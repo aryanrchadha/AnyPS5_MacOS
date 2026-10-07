@@ -13,6 +13,7 @@ struct SystemView: View {
                     ReadinessCard().reveal(0.05)
                     PipelineCard().reveal(0.12)
                 }
+                DisplayCard().reveal(0.15)
                 LimitsCard().reveal(0.18)
             }
         }
@@ -142,6 +143,63 @@ private struct PipelineCard: View {
     }
 }
 
+private struct DisplayCard: View {
+    @State var displays: [DisplayTarget] = []
+    @State var gpu: GPUReport?
+
+    var body: some View {
+        BezelCard(padding: 26) {
+            VStack(alignment: .leading, spacing: 18) {
+                CardHeader(eyebrow: "Display and GPU", title: "4K at 120 Hz readiness",
+                           trailing: AnyView(GhostButton(title: "Refresh", symbol: "arrow.clockwise") { refresh() }))
+                if let gpu {
+                    HStack(spacing: 8) {
+                        Chip(text: gpu.name, symbol: "cpu")
+                        Chip(text: "\(ByteCountFormatter.string(fromByteCount: Int64(gpu.recommendedWorkingSetBytes), countStyle: .memory)) GPU working set",
+                             symbol: "memorychip")
+                        if gpu.unifiedMemory { Chip(text: "Unified memory", symbol: "square.stack") }
+                        Chip(text: gpu.supportsRaytracing ? "Metal ray tracing" : "No Metal ray tracing",
+                             symbol: "light.max")
+                    }
+                }
+                VStack(spacing: 0) {
+                    ForEach(displays.indices, id: \.self) { index in
+                        let display = displays[index]
+                        HStack(spacing: 12) {
+                            StatusDot(color: display.supports4K && display.supports120Hz ? Theme.success : Theme.warning)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(display.name)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("\(display.pixelWidth) × \(display.pixelHeight) pixels in the current mode · up to \(display.maximumRefreshRate) Hz")
+                                    .font(.captionText)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Spacer()
+                            Chip(text: display.supports4K ? "4K" : "Below 4K",
+                                 tint: display.supports4K ? Theme.success : Theme.warning)
+                            Chip(text: display.supports120Hz ? "120 Hz" : "\(display.maximumRefreshRate) Hz",
+                                 tint: display.supports120Hz ? Theme.success : Theme.warning)
+                        }
+                        .padding(.vertical, 10)
+                        if index < displays.count - 1 { Hairline() }
+                    }
+                }
+                Text("A 4K, 120 Hz display is required for 4K at 120 FPS but does not deliver it. The runtime presents with vsync, so frame rate is capped by the display and by how often the title submits frames; most titles pace themselves at 30 or 60 FPS. Rosetta 2, Wine and MoltenVK each add overhead. Turn on the Metal Performance HUD in a title's launch options to measure the real frame rate.")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .onAppear { refresh() }
+    }
+
+    private func refresh() {
+        displays = DisplayProbe.displays()
+        gpu = DisplayProbe.gpu()
+    }
+}
+
 private struct LimitsCard: View {
     private let limits: [(String, String)] = [
         ("No native macOS output yet",
@@ -152,6 +210,8 @@ private struct LimitsCard: View {
          "Titles may commit up to 13.5 GiB of direct memory at once. Machines with 16 GB of unified memory will likely run out."),
         ("Linux output",
          "Linux images need a Linux x86-64 host. Conversion works here; running them does not."),
+        ("AAA and online titles",
+         "docs/user/COMPATIBILITY.md lists the titles verified so far. Titles that depend on online services, anti-cheat or runtime features that are not implemented yet are not expected to start."),
     ]
 
     var body: some View {

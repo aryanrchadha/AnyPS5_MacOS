@@ -16,6 +16,16 @@ Converted titles are x86-64 programs. On Apple Silicon they execute through Rose
 
 Running Windows output through Wine on Apple Silicon has not been verified by the project. Expect failures around fixed-address memory reservation, direct memory commit (up to 13824 MiB per title), and Vulkan features that MoltenVK does not expose.
 
+## Performance
+
+The System page reports each display's current resolution and maximum refresh rate, and the GPU's name and recommended working set, against a 4K, 120 Hz target. Meeting it is necessary but not sufficient:
+
+- The runtime presents with vsync (`VK_PRESENT_MODE_FIFO_KHR`), so the frame rate never exceeds the display's refresh rate or the rate at which the title submits frames. Most titles pace themselves at 30 or 60 FPS, and the runtime does not unlock that.
+- On Apple Silicon, titles run through Rosetta 2, Wine and MoltenVK on top of the runtime's shader recompilation; each layer costs CPU and GPU time.
+- Whether a title starts at all depends on the system library coverage it needs. See [COMPATIBILITY.md](COMPATIBILITY.md) for verified titles.
+
+Measure rather than assume: enable the Metal Performance HUD for the title and read the frame rate and frame time during play.
+
 ## Build
 
 Requirements: Xcode 15 or newer (or the Command Line Tools with Swift 5.9+), CMake 3.20+. Ninja is used when present.
@@ -51,6 +61,23 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - *Import libraries* copies `*.prx` files built on a Windows or Linux host into `libs/`.
    - *Link game files* symlinks the game's resources into `app0/` without copying. Module folders are skipped, because the relinker writes converted modules there.
 6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,).
+
+7. **Controls.** Edits [`anyps5-input.ini`](INPUT_MAPPING.md) beside a converted title.
+   - Every action shows its current keyboard and mouse bindings, with the built-in defaults until changed.
+   - *Key* records the next key press, modifier keys included. Mouse buttons and wheel directions come from the mouse menu.
+   - The same rules as the runtime apply: `ToggleFullscreen` accepts keys only, the wheel maps only to pad buttons, and `#` and `;` cannot be bound because they start comments.
+   - A binding shared by two actions is outlined in amber.
+   - Lines the runtime would reject are listed before saving. Saving with no changes from the defaults removes the file.
+8. **Add to Applications.** Creates `~/Applications/AnyPS5/<Title>.app` for Windows output. It launches the title through the selected Wine runtime with the Settings environment, and uses the game's icon. Rebuild it after changing the runtime or the environment.
+
+9. **Launch options.** *Options* on a Library card, or beside Launch in the Console, sets per-title settings applied over the Settings environment:
+   - the Metal Performance HUD (`MTL_HUD_ENABLED=1`), an on-screen frame rate and frame time overlay drawn by macOS;
+   - disabling the shader cache (`ANYPS5_NO_SHADER_CACHE=1`);
+   - extra variables.
+
+   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
+
+Each conversion also produces a report (target, guest modules, system imports, NID references, AMD-only rewrites, and the failure reason if any). It appears in the Console and on Library cards. *Import fonts* copies `.otf`, `.ttf` and `.ttc` files into `anyps5-fonts/` (see [System fonts](USAGE.md#system-fonts)). When a title ID appears in [`COMPATIBILITY.md`](COMPATIBILITY.md), its tested status is shown on the Convert page.
 
 When the app is in the background, it posts a notification when a conversion or batch finishes, and the Dock icon shows how many titles remain.
 

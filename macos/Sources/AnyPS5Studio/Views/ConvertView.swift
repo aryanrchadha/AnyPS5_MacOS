@@ -117,6 +117,10 @@ private struct SourceCard: View {
                         Chip(text: "\(inspection.moduleCount) modules", symbol: "square.stack.3d.up")
                     }
                     .padding(.top, 4)
+                    if let record = model.compatibility?.record(for: inspection.titleId) {
+                        Chip(text: record.summary, symbol: "checkmark.seal", tint: Theme.accent)
+                            .help("From docs/user/COMPATIBILITY.md")
+                    }
                 }
                 Spacer(minLength: 0)
             }

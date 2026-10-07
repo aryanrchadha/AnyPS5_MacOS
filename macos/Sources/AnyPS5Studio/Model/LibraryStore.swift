@@ -11,10 +11,16 @@ struct LibraryEntry: Codable, Identifiable, Equatable {
     var convertedAt: Date
     var exitCode: Int32
     var iconURL: URL?
+    var report: ConversionReport?
+    var profile: LaunchProfile?
+    var sessions: [PlaySession]?
 
     var succeeded: Bool { exitCode == 0 }
     var outputExists: Bool { FileManager.default.fileExists(atPath: output.path) }
     var sourceExists: Bool { FileManager.default.fileExists(atPath: source.path) }
+    var launchProfile: LaunchProfile { profile ?? LaunchProfile() }
+    var playTime: TimeInterval { (sessions ?? []).reduce(0) { $0 + $1.duration } }
+    var lastSession: PlaySession? { sessions?.last }
 }
 
 @Observable
@@ -35,9 +41,38 @@ final class LibraryStore {
     }
 
     func record(_ entry: LibraryEntry) {
+        var entry = entry
+        if let previous = self.entry(for: entry.output) {
+            entry.profile = entry.profile ?? previous.profile
+            entry.sessions = entry.sessions ?? previous.sessions
+        }
         entries.removeAll { $0.output.standardizedFileURL == entry.output.standardizedFileURL }
         entries.insert(entry, at: 0)
         save()
+    }
+
+    func entry(for output: URL) -> LibraryEntry? {
+        entries.first { $0.output.standardizedFileURL == output.standardizedFileURL }
+    }
+
+    func update(_ entry: LibraryEntry) {
+        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
+        entries[index] = entry
+        save()
+    }
+
+    func setProfile(_ profile: LaunchProfile, for output: URL) {
+        guard var entry = entry(for: output) else { return }
+        entry.profile = profile == LaunchProfile() ? nil : profile
+        update(entry)
+    }
+
+    func addSession(_ session: PlaySession, for output: URL) {
+        guard var entry = entry(for: output) else { return }
+        var sessions = entry.sessions ?? []
+        sessions.append(session)
+        entry.sessions = Array(sessions.suffix(200))
+        update(entry)
     }
 
     func remove(_ entry: LibraryEntry) {

@@ -13,6 +13,7 @@ struct RootView: View {
                 switch model.route {
                 case .convert: ConvertView()
                 case .library: LibraryView()
+                case .controls: ControlsView()
                 case .console: ConsoleView()
                 case .system: SystemView()
                 }

@@ -73,6 +73,7 @@ final class AppModel {
     let runner = ProcessRunner()
     let library = LibraryStore()
     let compatibility = CompatibilityList.load()
+    let controllers = ControllerMonitor()
     @ObservationIgnored private var conversionStartLine = -1
 
     private enum Keys {
@@ -565,6 +566,89 @@ final class AppModel {
     func createLauncherForCurrent() {
         guard let inspection, let output = outputExecutable else { return }
         createLauncher(title: inspection.displayTitle, titleId: inspection.titleId, executable: output, iconURL: inspection.iconURL)
+    }
+
+    func saveBackups(title: String, titleId: String?) -> [SaveBackup] {
+        SaveData.backups(in: SaveData.backupFolder(title: title, titleId: titleId))
+    }
+
+    @discardableResult
+    func backupSaves(output: URL, title: String, titleId: String?, quiet: Bool = false) -> URL? {
+        let source = SaveData.directory(besides: output)
+        guard SaveData.hasSaves(at: source) else {
+            if !quiet { banner = "\(title) has no save data yet." }
+            return nil
+        }
+        let folder = SaveData.backupFolder(title: title, titleId: titleId)
+        let archive = folder.appendingPathComponent(SaveData.backupName(for: Date()))
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try runTool("/usr/bin/ditto", ["-c", "-k", "--sequesterRsrc", "--keepParent", source.path, archive.path])
+            runner.note("Backed up \(title) saves to \(archive.path)")
+            return archive
+        } catch {
+            banner = "Backing up saves failed: \(error)"
+            return nil
+        }
+    }
+
+    func restoreSaves(_ backup: SaveBackup, output: URL, title: String, titleId: String?) {
+        let alert = NSAlert()
+        alert.messageText = "Restore saves from \(backup.url.deletingPathExtension().lastPathComponent)?"
+        alert.informativeText = "The current save data of \(title) is backed up first, then replaced."
+        alert.addButton(withTitle: "Restore")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let destination = SaveData.directory(besides: output)
+        if SaveData.hasSaves(at: destination), backupSaves(output: output, title: title, titleId: titleId, quiet: true) == nil { return }
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) { try FileManager.default.removeItem(at: destination) }
+            try runTool("/usr/bin/ditto", ["-x", "-k", backup.url.path, output.deletingLastPathComponent().path])
+            guard FileManager.default.fileExists(atPath: destination.path) else {
+                throw TitleDataError.invalid("The backup does not contain a \(SaveData.folderName) folder.")
+            }
+            runner.note("Restored \(title) saves from \(backup.url.path)")
+        } catch {
+            banner = "Restoring saves failed: \(error)"
+        }
+    }
+
+    func entitlementsURL(for output: URL) -> URL {
+        output.deletingLastPathComponent().appendingPathComponent(EntitlementsFile.fileName)
+    }
+
+    func loadEntitlements(for output: URL) -> EntitlementsFile {
+        let text = (try? String(contentsOf: entitlementsURL(for: output), encoding: .utf8)) ?? ""
+        return EntitlementsFile(contents: text)
+    }
+
+    func saveEntitlements(_ file: EntitlementsFile, for output: URL) {
+        let url = entitlementsURL(for: output)
+        do {
+            if file.labels.isEmpty {
+                if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
+            } else {
+                try file.serialized.write(to: url, atomically: true, encoding: .utf8)
+            }
+        } catch {
+            banner = "Saving \(EntitlementsFile.fileName) failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func runTool(_ path: String, _ arguments: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        let errors = Pipe()
+        process.standardError = errors
+        process.standardOutput = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let message = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            throw TitleDataError.toolFailed("\((path as NSString).lastPathComponent) exited with \(process.terminationStatus): \(message)")
+        }
     }
 
     func saveLog() {

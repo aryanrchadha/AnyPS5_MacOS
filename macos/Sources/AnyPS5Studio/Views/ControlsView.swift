@@ -70,6 +70,7 @@ struct ControlsView: View {
              subtitle: "Edit \(InputConfig.fileName) beside a converted title. Controllers recognised by SDL work without configuration; these bindings change the keyboard and mouse only.") {
             VStack(alignment: .leading, spacing: 20) {
                 ControlsHeader(recorder: recorder).reveal(0.04)
+                ControllerStatus().reveal(0.05)
                 if model.inputConfigDirectory != nil {
                     if !model.inputConfig.issues.isEmpty {
                         Callout(text: "The existing file has lines the runtime would reject. Saving rewrites the file without them.\n"
@@ -316,6 +317,39 @@ private struct BindingChip: View {
         .overlay(Capsule().strokeBorder(sharedWith.isEmpty ? Theme.hairline : Theme.warning.opacity(0.5), lineWidth: 1))
         .help(sharedWith.isEmpty ? source.text : "\(source.text) is also bound to \(sharedWith.joined(separator: ", "))")
         .onHover { inside in withAnimation(Motion.snap) { hovering = inside } }
+    }
+}
+
+private struct ControllerStatus: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let controllers = model.controllers.controllers
+        HStack(spacing: 10) {
+            Image(systemName: "gamecontroller")
+                .font(.system(size: 14, weight: .light))
+                .foregroundStyle(controllers.isEmpty ? Theme.textTertiary : Theme.success)
+            if controllers.isEmpty {
+                Text("No game controller connected. Pair one in System Settings › Bluetooth; titles use it without configuration.")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                Text("Connected:")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textSecondary)
+                ForEach(controllers) { controller in
+                    Chip(text: controller.battery.map { "\(controller.name) · \(Int($0 * 100))%" } ?? controller.name,
+                         symbol: "gamecontroller", tint: Theme.success)
+                        .help(controller.category)
+                }
+                Text("The first one is used.")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            Spacer()
+            GhostButton(title: "Refresh", symbol: "arrow.clockwise") { model.controllers.refresh() }
+        }
+        .padding(.horizontal, 6)
     }
 }
 

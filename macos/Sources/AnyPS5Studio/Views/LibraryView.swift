@@ -120,6 +120,7 @@ private struct LibraryCard: View {
                     GhostButton(title: "Reveal", symbol: "folder") { model.reveal(entry.output) }
                     if entry.succeeded && entry.outputExists {
                         LaunchOptionsButton(output: entry.output)
+                        TitleDataButton(entry: entry)
                     }
                     Spacer(minLength: 0)
                     if entry.target == .windows && entry.succeeded && entry.outputExists && !model.system.wineRuntimes.isEmpty {

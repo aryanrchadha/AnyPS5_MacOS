@@ -77,6 +77,13 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 
    The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
 
+10. **Title data.** *Data* on a Library card manages the title's runtime files:
+    - **Save data:** the runtime keeps saves in `_sd/` beside the executable, because guest paths resolve against the working directory. *Back up* writes a zip to `Documents/AnyPS5 Saves/<Title>/`. *Restore* backs up the current saves first, then replaces them.
+    - **Owned add-ons:** edits `anyps5-entitlements.ini`, the entitlement labels of add-ons you own, which the runtime reports as installed. Labels are up to 15 characters; `#` and `;` start comments.
+11. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window.
+
+The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed.
+
 Each conversion also produces a report (target, guest modules, system imports, NID references, AMD-only rewrites, and the failure reason if any). It appears in the Console and on Library cards. *Import fonts* copies `.otf`, `.ttf` and `.ttc` files into `anyps5-fonts/` (see [System fonts](USAGE.md#system-fonts)). When a title ID appears in [`COMPATIBILITY.md`](COMPATIBILITY.md), its tested status is shown on the Convert page.
 
 When the app is in the background, it posts a notification when a conversion or batch finishes, and the Dock icon shows how many titles remain.

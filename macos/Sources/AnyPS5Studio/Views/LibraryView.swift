@@ -101,6 +101,12 @@ private struct LibraryCard: View {
                          : "Output no longer exists")
                         .font(.captionText)
                         .foregroundStyle(Theme.textTertiary)
+                    if entry.sessions?.isEmpty == false {
+                        Text(SessionSummary.text(for: entry))
+                            .font(.captionText)
+                            .foregroundStyle(Theme.textTertiary)
+                            .lineLimit(1)
+                    }
                     if let summary = reportSummary {
                         Text(summary)
                             .font(.captionText)
@@ -112,6 +118,9 @@ private struct LibraryCard: View {
                 HStack(spacing: 8) {
                     GhostButton(title: "Reopen", symbol: "arrow.uturn.backward") { model.reopen(entry) }
                     GhostButton(title: "Reveal", symbol: "folder") { model.reveal(entry.output) }
+                    if entry.succeeded && entry.outputExists {
+                        LaunchOptionsButton(output: entry.output)
+                    }
                     Spacer(minLength: 0)
                     if entry.target == .windows && entry.succeeded && entry.outputExists && !model.system.wineRuntimes.isEmpty {
                         IslandButton(title: "Launch", symbol: "play.fill", enabled: !model.runner.state.isRunning) {

@@ -130,15 +130,28 @@ final class AppModel {
     var canConvert: Bool { blockingIssue == nil && !runner.state.isRunning }
 
     var parsedWineEnvironment: [String: String] {
-        var result: [String: String] = [:]
-        for line in wineEnvironment.split(whereSeparator: \.isNewline) {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty, !trimmed.hasPrefix("#"), let separator = trimmed.firstIndex(of: "=") else { continue }
-            let key = trimmed[..<separator].trimmingCharacters(in: .whitespaces)
-            guard !key.isEmpty else { continue }
-            result[key] = String(trimmed[trimmed.index(after: separator)...])
+        EnvironmentText.parse(wineEnvironment)
+    }
+
+    func launchEnvironment(for output: URL) -> [String: String] {
+        (library.entry(for: output)?.launchProfile ?? LaunchProfile()).merged(over: parsedWineEnvironment)
+    }
+
+    func setProfile(_ profile: LaunchProfile, for output: URL) {
+        library.setProfile(profile, for: output)
+    }
+
+    func shaderCacheSize(for output: URL) -> (files: Int, bytes: Int64) {
+        ShaderCache.size(at: ShaderCache.directory(besides: output))
+    }
+
+    func clearShaderCache(for output: URL) {
+        do {
+            try ShaderCache.clear(at: ShaderCache.directory(besides: output))
+            runner.note("Cleared the shader cache for \(output.lastPathComponent)")
+        } catch {
+            banner = "Clearing the shader cache failed: \(error.localizedDescription)"
         }
-        return result
     }
 
     func refreshEnvironment() {
@@ -343,9 +356,18 @@ final class AppModel {
     private func launch(output: URL, target: TargetPlatform) {
         guard target == .windows, let wine = selectedWine else { return }
         route = .console
+        let environment = launchEnvironment(for: output)
+        let overrides = environment.keys.sorted().map { "\($0)=\(environment[$0] ?? "")" }.joined(separator: " ")
+        if !overrides.isEmpty { runner.note("Environment: \(overrides)") }
+        let started = Date()
         runner.run(label: "Launch via \(wine.name)", executable: wine.executable, arguments: [output.path],
                    workingDirectory: output.deletingLastPathComponent(),
-                   environment: parsedWineEnvironment)
+                   environment: environment) { [weak self] code in
+            guard let self else { return }
+            let duration = Date().timeIntervalSince(started)
+            self.library.addSession(PlaySession(start: started, duration: duration, exitCode: code), for: output)
+            self.runner.note("Session ended after \(Int(duration))s with exit code \(code).")
+        }
     }
 
     func reveal(_ url: URL) {
@@ -525,7 +547,7 @@ final class AppModel {
         }
         do {
             let app = try LauncherBuilder.build(title: title, titleId: titleId, executable: executable,
-                                                wine: wine.executable, environment: parsedWineEnvironment)
+                                                wine: wine.executable, environment: launchEnvironment(for: executable))
             if let iconURL, let image = NSImage(contentsOf: iconURL) {
                 NSWorkspace.shared.setIcon(image, forFile: app.path, options: [])
             }

@@ -234,6 +234,9 @@ private struct FlowButtons: View {
                                      enabled: model.layout?.isComplete == true && !model.runner.state.isRunning) {
                             model.launch()
                         }
+                        if let output = model.outputExecutable, model.library.entry(for: output) != nil {
+                            LaunchOptionsButton(output: output)
+                        }
                         GhostButton(title: "Add to Applications", symbol: "app.badge") { model.createLauncherForCurrent() }
                             .disabled(model.layout?.executableExists != true)
                             .opacity(model.layout?.executableExists == true ? 1 : 0.4)

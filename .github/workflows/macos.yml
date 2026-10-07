@@ -1,0 +1,45 @@
+name: macOS
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'macos/**'
+      - 'core/relinker/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/macos.yml'
+  pull_request:
+    paths:
+      - 'macos/**'
+      - 'core/relinker/**'
+      - 'CMakeLists.txt'
+      - '.github/workflows/macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple-silicon:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Relinker tests (arm64, native)
+        run: |
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release -DANYPS5_RELINKER_ONLY=ON -DBUILD_TESTING=ON
+          cmake --build build-tests --parallel
+          ctest --test-dir build-tests --output-on-failure --timeout 120
+      - name: Build AnyPS5 Studio.app
+        run: DMG=1 bash macos/scripts/build-app.sh
+      - uses: actions/upload-artifact@v7
+        with:
+          name: AnyPS5-Studio-macOS-arm64
+          path: build-macos/AnyPS5-Studio.dmg
+          if-no-files-found: error

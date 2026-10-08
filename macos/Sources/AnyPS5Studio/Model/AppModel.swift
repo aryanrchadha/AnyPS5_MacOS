@@ -362,11 +362,13 @@ final class AppModel {
     }
 
     private func launch(output: URL, target: TargetPlatform) {
-        guard target == .windows, let wine = selectedWine else { return }
+        guard target == .windows, let wine = selectedWine, !runner.state.isRunning else { return }
         route = .console
-        if let entry = library.entry(for: output), entry.launchProfile.backupSavesOnLaunch {
+        let entry = library.entry(for: output)
+        if let entry, entry.launchProfile.backupSavesOnLaunch {
             backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
         }
+        let firstLine = runner.lines.last?.id ?? -1
         let environment = launchEnvironment(for: output)
         let overrides = environment.keys.sorted().map { "\($0)=\(environment[$0] ?? "")" }.joined(separator: " ")
         if !overrides.isEmpty { runner.note("Environment: \(overrides)") }
@@ -378,7 +380,58 @@ final class AppModel {
             let duration = Date().timeIntervalSince(started)
             self.library.addSession(PlaySession(start: started, duration: duration, exitCode: code), for: output)
             self.runner.note("Session ended after \(Int(duration))s with exit code \(code).")
+            let title = entry?.title ?? output.deletingPathExtension().lastPathComponent
+            let lines = self.runner.lines.filter { $0.id > firstLine }
+            self.writeSessionLog(lines, title: title, titleId: entry?.titleId, started: started, duration: duration, exitCode: code)
         }
+    }
+
+    private func writeSessionLog(_ lines: [LogLine], title: String, titleId: String?, started: Date,
+                                 duration: TimeInterval, exitCode: Int32) {
+        let folder = SessionLog.folder(title: title, titleId: titleId)
+        let file = folder.appendingPathComponent(SessionLog.fileName(for: started))
+        let text = SessionLog.text(lines, title: title, started: started, duration: duration, exitCode: exitCode)
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try text.write(to: file, atomically: true, encoding: .utf8)
+            for expired in SessionLog.expired(SessionLog.logs(in: folder)) {
+                try? FileManager.default.removeItem(at: expired)
+            }
+            runner.note("Session log saved to \(file.path)")
+        } catch {
+            runner.note("Could not save the session log: \(error.localizedDescription)")
+        }
+    }
+
+    func lastSessionLog(for entry: LibraryEntry) -> URL? {
+        SessionLog.logs(in: SessionLog.folder(title: entry.title, titleId: entry.titleId)).first
+    }
+
+    func openLastSessionLog(for entry: LibraryEntry) {
+        guard let log = lastSessionLog(for: entry) else {
+            banner = "\(entry.title) has no session logs yet."
+            return
+        }
+        NSWorkspace.shared.open(log)
+    }
+
+    var launchableEntries: [LibraryEntry] {
+        library.entries.filter { $0.target == .windows && $0.succeeded && $0.outputExists }
+    }
+
+    var lastPlayedEntry: LibraryEntry? {
+        launchableEntries
+            .filter { $0.lastSession != nil }
+            .max { LibraryOrganizer.lastActivity($0) < LibraryOrganizer.lastActivity($1) }
+    }
+
+    var canLaunchLastPlayed: Bool {
+        lastPlayedEntry != nil && selectedWine != nil && !runner.state.isRunning
+    }
+
+    func launchLastPlayed() {
+        guard let entry = lastPlayedEntry else { return }
+        launch(entry)
     }
 
     func reveal(_ url: URL) {

@@ -37,6 +37,9 @@ struct AnyPS5StudioApp: App {
                 Button("Stop") { model.cancel() }
                     .keyboardShortcut(".", modifiers: .command)
                     .disabled(!model.runner.state.isRunning)
+                Button(model.lastPlayedEntry.map { "Launch \($0.title)" } ?? "Launch Last Played") { model.launchLastPlayed() }
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
+                    .disabled(!model.canLaunchLastPlayed)
                 Divider()
                 ForEach(Route.allCases) { route in
                     Button(route.title) { model.route = route }

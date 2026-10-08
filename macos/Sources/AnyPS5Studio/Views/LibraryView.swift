@@ -181,6 +181,8 @@ private struct LibraryCard: View {
             Button("Add to Applications") { model.createLauncher(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded || !entry.outputExists || model.selectedWine == nil)
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
+            Button("Open Last Session Log") { model.openLastSessionLog(for: entry) }
+                .disabled(entry.lastSession == nil)
             Button("Export Diagnostics…") { model.exportDiagnostics(for: entry) }
             Divider()
             Button("Remove from Library", role: .destructive) { model.library.remove(entry) }

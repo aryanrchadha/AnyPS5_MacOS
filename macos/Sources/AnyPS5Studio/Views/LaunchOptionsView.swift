@@ -31,6 +31,16 @@ struct LaunchOptionsPanel: View {
                           flag: "ANYPS5_NO_SHADER_CACHE=1",
                           isOn: $profile.disableShaderCache)
                 Hairline()
+                OptionRow(title: "Quiet Wine logging",
+                          detail: "Turn off Wine's own debug channels to cut console noise. Runtime output still appears; Wine errors do not.",
+                          flag: "WINEDEBUG=-all",
+                          isOn: $profile.quietWine)
+                Hairline()
+                OptionRow(title: "Back up saves on launch",
+                          detail: "Archive the save folder before each launch. The newest \(SaveData.automaticRetention) automatic backups are kept.",
+                          flag: "\(SaveData.folderName) → Documents/AnyPS5 Saves",
+                          isOn: $profile.backupSavesOnLaunch)
+                Hairline()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Extra environment")
                         .font(.system(size: 13, weight: .medium))
@@ -87,6 +97,7 @@ struct LaunchOptionsPanel: View {
 }
 
 struct SessionSummary: View {
+    @Environment(AppModel.self) private var model
     let entry: LibraryEntry
 
     var body: some View {
@@ -99,9 +110,15 @@ struct SessionSummary: View {
                 .font(.captionText)
                 .foregroundStyle(Theme.textSecondary)
             if let last = sessions.last, last.exitCode != 0 {
-                Text("The last session exited with code \(last.exitCode). The Console has its output.")
+                Text("The last session exited with code \(last.exitCode). Its log has the full output.")
                     .font(.captionText)
                     .foregroundStyle(Theme.warning)
+            }
+            if !sessions.isEmpty {
+                Button("Open last session log") { model.openLastSessionLog(for: entry) }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.accent)
             }
         }
     }

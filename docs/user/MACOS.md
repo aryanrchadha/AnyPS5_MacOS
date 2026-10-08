@@ -73,9 +73,13 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 9. **Launch options.** *Options* on a Library card, or beside Launch in the Console, sets per-title settings applied over the Settings environment:
    - the Metal Performance HUD (`MTL_HUD_ENABLED=1`), an on-screen frame rate and frame time overlay drawn by macOS;
    - disabling the shader cache (`ANYPS5_NO_SHADER_CACHE=1`);
-   - extra variables.
+   - quiet Wine logging (`WINEDEBUG=-all`), which turns off Wine's own debug channels. The title's output still appears; Wine's error messages do not, so leave it off when diagnosing a crash. A `WINEDEBUG` line in the extra variables takes precedence;
+   - extra variables;
+   - backing up saves on launch: before each launch from Studio, `_sd/` is archived as an `Auto` backup in `Documents/AnyPS5 Saves/<Title>/`. The newest 5 automatic backups are kept; manual backups are never removed.
 
-   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
+   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same environment settings but do not back up saves or write session logs.
+
+   Each launch from Studio writes its console output to `~/Library/Logs/AnyPS5 Studio/<Title>/Session <date>.log`, which Console.app can also open. Lines from standard error start with `!` and Studio's own notes with `#`. The newest 10 logs per title are kept. *Open last session log* is in the Options panel and the card's context menu.
 
 10. **Title data.** *Data* on a Library card manages the title's runtime files:
     - **Save data:** the runtime keeps saves in `_sd/` beside the executable, because guest paths resolve against the working directory. *Back up* writes a zip to `Documents/AnyPS5 Saves/<Title>/`. *Restore* backs up the current saves first, then replaces them.
@@ -85,7 +89,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
     - *Move Conversion to Trash* removes a title's output folder, with the option to back up its saves first. It only acts on folders laid out by AnyPS5 Studio (`<name>/<name>.exe`).
     - *Export Diagnostics*, from a card or the System page, writes a text report with system details, the title's conversion report and sessions, and the console log, for bug reports. It contains file paths; review it before sharing.
 12. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
-13. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window.
+13. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window. *Continue* at the top relaunches the most recently played title; *Launch Last Played* (⇧⌘L) in the Conversion menu does the same.
 
 The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed.
 

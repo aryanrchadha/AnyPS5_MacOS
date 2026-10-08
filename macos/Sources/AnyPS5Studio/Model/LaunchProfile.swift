@@ -4,9 +4,30 @@ struct LaunchProfile: Codable, Equatable {
     var metalHUD = false
     var disableShaderCache = false
     var extraEnvironment = ""
+    var backupSavesOnLaunch = false
+    var quietWine = false
+
+    init(metalHUD: Bool = false, disableShaderCache: Bool = false, extraEnvironment: String = "",
+         backupSavesOnLaunch: Bool = false, quietWine: Bool = false) {
+        self.metalHUD = metalHUD
+        self.disableShaderCache = disableShaderCache
+        self.extraEnvironment = extraEnvironment
+        self.backupSavesOnLaunch = backupSavesOnLaunch
+        self.quietWine = quietWine
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        metalHUD = try container.decodeIfPresent(Bool.self, forKey: .metalHUD) ?? false
+        disableShaderCache = try container.decodeIfPresent(Bool.self, forKey: .disableShaderCache) ?? false
+        extraEnvironment = try container.decodeIfPresent(String.self, forKey: .extraEnvironment) ?? ""
+        backupSavesOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .backupSavesOnLaunch) ?? false
+        quietWine = try container.decodeIfPresent(Bool.self, forKey: .quietWine) ?? false
+    }
 
     var environment: [String: String] {
-        var result = EnvironmentText.parse(extraEnvironment)
+        var result: [String: String] = quietWine ? ["WINEDEBUG": "-all"] : [:]
+        result.merge(EnvironmentText.parse(extraEnvironment)) { _, explicit in explicit }
         if metalHUD { result["MTL_HUD_ENABLED"] = "1" }
         if disableShaderCache { result["ANYPS5_NO_SHADER_CACHE"] = "1" }
         return result

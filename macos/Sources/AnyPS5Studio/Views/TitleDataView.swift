@@ -48,12 +48,17 @@ struct TitleDataPanel: View {
                     VStack(spacing: 0) {
                         ForEach(backups.prefix(5)) { backup in
                             HStack {
-                                Image(systemName: "archivebox")
+                                Image(systemName: SaveData.isAutomatic(backup) ? "clock.arrow.circlepath" : "archivebox")
                                     .font(.system(size: 11, weight: .light))
                                     .foregroundStyle(Theme.textTertiary)
                                 Text(backup.created.formatted(date: .abbreviated, time: .shortened))
                                     .font(.captionText)
                                     .foregroundStyle(Theme.textPrimary)
+                                if SaveData.isAutomatic(backup) {
+                                    Text("Auto")
+                                        .font(.captionText)
+                                        .foregroundStyle(Theme.textTertiary)
+                                }
                                 Text(ByteCountFormatter.string(fromByteCount: backup.bytes, countStyle: .file))
                                     .font(.captionText)
                                     .foregroundStyle(Theme.textTertiary)
@@ -159,7 +164,7 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let launchable = model.library.entries.filter { $0.target == .windows && $0.succeeded && $0.outputExists }
+        let launchable = model.launchableEntries
         switch model.runner.state {
         case .running(let label, _):
             Text(label + "…")
@@ -173,6 +178,11 @@ struct MenuBarContent: View {
         } else if model.selectedWine == nil {
             Text("Install a Wine runtime to launch titles")
         } else {
+            if let last = model.lastPlayedEntry {
+                Button("Continue \(last.title)") { model.launch(last) }
+                    .disabled(model.runner.state.isRunning)
+                Divider()
+            }
             ForEach(launchable.prefix(8)) { entry in
                 Button("Launch \(entry.title)") { model.launch(entry) }
                     .disabled(model.runner.state.isRunning)

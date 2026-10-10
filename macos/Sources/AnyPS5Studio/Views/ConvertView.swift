@@ -9,13 +9,7 @@ struct ConvertView: View {
              title: "Convert a PS5 title",
              subtitle: "Drop a decrypted game folder. The relinker rewrites its executable and modules into a native Windows or Linux image without emulation.") {
             VStack(spacing: 20) {
-                if let banner = model.banner {
-                    HStack {
-                        Callout(text: banner)
-                        GhostButton(title: "Dismiss", symbol: "xmark") { model.banner = nil }
-                    }
-                    .reveal()
-                }
+                BannerRow()
 
                 WeightedRow(weights: [1.65, 1]) {
                     SourceCard().reveal(0.05)
@@ -503,6 +497,20 @@ private struct OutputCard: View {
                                  enabled: model.canConvert) { model.convert() }
                 }
             }
+        }
+    }
+}
+
+struct BannerRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        if let banner = model.banner {
+            HStack {
+                Callout(text: banner)
+                GhostButton(title: "Dismiss", symbol: "xmark") { model.banner = nil }
+            }
+            .reveal()
         }
     }
 }

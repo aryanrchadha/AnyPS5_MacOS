@@ -51,9 +51,12 @@ struct RootView: View {
 
     private func drainOpenRequests() {
         let urls = OpenRequests.drain()
-        guard !urls.isEmpty else { return }
+        let links = urls.compactMap(StudioLink.init(url:))
+        let files = urls.filter { $0.isFileURL }
+        for link in links { model.handle(link) }
+        guard !files.isEmpty else { return }
         withAnimation(Motion.settle) {
-            model.open(urls)
+            model.open(files)
             model.route = .convert
         }
     }

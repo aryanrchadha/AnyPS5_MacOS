@@ -6,14 +6,16 @@ struct LaunchProfile: Codable, Equatable {
     var extraEnvironment = ""
     var backupSavesOnLaunch = false
     var quietWine = false
+    var wineRuntimePath: String?
 
     init(metalHUD: Bool = false, disableShaderCache: Bool = false, extraEnvironment: String = "",
-         backupSavesOnLaunch: Bool = false, quietWine: Bool = false) {
+         backupSavesOnLaunch: Bool = false, quietWine: Bool = false, wineRuntimePath: String? = nil) {
         self.metalHUD = metalHUD
         self.disableShaderCache = disableShaderCache
         self.extraEnvironment = extraEnvironment
         self.backupSavesOnLaunch = backupSavesOnLaunch
         self.quietWine = quietWine
+        self.wineRuntimePath = wineRuntimePath
     }
 
     init(from decoder: Decoder) throws {
@@ -23,6 +25,7 @@ struct LaunchProfile: Codable, Equatable {
         extraEnvironment = try container.decodeIfPresent(String.self, forKey: .extraEnvironment) ?? ""
         backupSavesOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .backupSavesOnLaunch) ?? false
         quietWine = try container.decodeIfPresent(Bool.self, forKey: .quietWine) ?? false
+        wineRuntimePath = try container.decodeIfPresent(String.self, forKey: .wineRuntimePath)
     }
 
     var environment: [String: String] {

@@ -21,6 +21,8 @@ struct LaunchOptionsPanel: View {
             if entry == nil {
                 Callout(text: "Convert this title first. Options are stored with its Library entry.")
             } else {
+                RuntimeRow(selection: $profile.wineRuntimePath)
+                Hairline()
                 OptionRow(title: "Metal Performance HUD",
                           detail: "Overlay with frame rate, frame time and GPU memory, drawn by macOS for Metal apps.",
                           flag: "MTL_HUD_ENABLED=1",
@@ -92,6 +94,40 @@ struct LaunchOptionsPanel: View {
         .onChange(of: profile) { _, newValue in
             guard loaded else { return }
             model.setProfile(newValue, for: output)
+        }
+    }
+}
+
+struct RuntimeRow: View {
+    @Environment(AppModel.self) private var model
+    @Binding var selection: String?
+
+    var body: some View {
+        let runtimes = model.system.wineRuntimes
+        let missing = selection.flatMap { path in runtimes.contains { $0.executable.path == path } ? nil : path }
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Wine runtime")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(missing.map { "\($0) is not installed; the default is used." }
+                     ?? "Used for this title by Launch, the menu bar and Add to Applications.")
+                    .font(.captionText)
+                    .foregroundStyle(missing == nil ? Theme.textSecondary : Theme.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Picker("Wine runtime", selection: $selection) {
+                Text("Default (\(model.selectedWine?.name ?? "none"))").tag(String?.none)
+                ForEach(runtimes) { runtime in
+                    Text("\(runtime.name) · \(runtime.executable.lastPathComponent)").tag(Optional(runtime.executable.path))
+                }
+                if let missing {
+                    Text("Not installed").tag(Optional(missing))
+                }
+            }
+            .labelsHidden()
+            .frame(maxWidth: 190)
         }
     }
 }

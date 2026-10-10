@@ -73,10 +73,30 @@ enum SaveData {
         executable.deletingLastPathComponent().appendingPathComponent(folderName, isDirectory: true)
     }
 
-    static var backupRoot: URL {
+    static let backupFolderKey = "saveBackupFolder"
+    static let backupFolderName = "AnyPS5 Saves"
+
+    static var defaultBackupRoot: URL {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents")
-        return documents.appendingPathComponent("AnyPS5 Saves", isDirectory: true)
+        return documents.appendingPathComponent(backupFolderName, isDirectory: true)
+    }
+
+    static var iCloudBackupRoot: URL? {
+        let drive = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: drive.path, isDirectory: &isDirectory), isDirectory.boolValue else { return nil }
+        return drive.appendingPathComponent(backupFolderName, isDirectory: true)
+    }
+
+    static func backupRoot(configured path: String?) -> URL {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), path.hasPrefix("/") else { return defaultBackupRoot }
+        return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+    }
+
+    static var backupRoot: URL {
+        backupRoot(configured: UserDefaults.standard.string(forKey: backupFolderKey))
     }
 
     static func backupFolder(title: String, titleId: String?, root: URL = backupRoot) -> URL {

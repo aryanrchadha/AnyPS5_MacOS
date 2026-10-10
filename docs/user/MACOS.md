@@ -76,23 +76,25 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - disabling the shader cache (`ANYPS5_NO_SHADER_CACHE=1`);
    - quiet Wine logging (`WINEDEBUG=-all`), which turns off Wine's own debug channels. The title's output still appears; Wine's error messages do not, so leave it off when diagnosing a crash. A `WINEDEBUG` line in the extra variables takes precedence;
    - extra variables;
-   - backing up saves on launch: before each launch from Studio, `_sd/` is archived as an `Auto` backup in `Documents/AnyPS5 Saves/<Title>/`. The newest 5 automatic backups are kept; manual backups are never removed.
+   - backing up saves on launch: before each launch from Studio, `_sd/` is archived as an `Auto` backup in the save backups folder. The newest 5 automatic backups are kept; manual backups are never removed.
 
    The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
 
    Each launch from Studio writes its console output to `~/Library/Logs/AnyPS5 Studio/<Title>/Session <date>.log`, which Console.app can also open. Lines from standard error start with `!` and Studio's own notes with `#`. The newest 10 logs per title are kept. *Open last session log* is in the Options panel and the card's context menu.
 
 10. **Title data.** *Data* on a Library card manages the title's runtime files:
-    - **Save data:** the runtime keeps saves in `_sd/` beside the executable, because guest paths resolve against the working directory. *Back up* writes a zip to `Documents/AnyPS5 Saves/<Title>/`. *Restore* backs up the current saves first, then replaces them.
+    - **Save data:** the runtime keeps saves in `_sd/` beside the executable, because guest paths resolve against the working directory. *Back up* writes a zip to `<save backups folder>/<Title>/`. *Restore* backs up the current saves first, then replaces them.
+    - **Save backups folder:** `Documents/AnyPS5 Saves` unless changed in Settings (⌘,), where *Use iCloud Drive* picks `iCloud Drive/AnyPS5 Saves` when iCloud Drive is on. Changing it does not move existing backups; restore lists only the current folder. Rebuild *Add to Applications* launchers afterwards, because they store the folder when created.
     - **Owned add-ons:** edits `anyps5-entitlements.ini`, the entitlement labels of add-ons you own, which the runtime reports as installed. Labels are up to 15 characters; `#` and `;` start comments.
 11. **Organise and clean up.**
     - The Library sorts by recent activity, title, play time or disk usage. Pinned titles stay on top.
     - Once a title has been played, a card above the grid shows play time for the last 7 days: the total, the number of sessions, the most played titles, and a bar per day. Sessions count on the day they started. Launches from *Add to Applications* apps are not included.
     - *Move Conversion to Trash* removes a title's output folder, with the option to back up its saves first. It only acts on folders laid out by AnyPS5 Studio (`<name>/<name>.exe`).
     - *Export Diagnostics*, from a card or the System page, writes a text report with system details, the title's conversion report and sessions, and the console log, for bug reports. It contains file paths; review it before sharing.
-12. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
-13. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window. *Continue* at the top relaunches the most recently played title; *Launch Last Played* (⇧⌘L) in the Conversion menu does the same.
-14. **Links.** AnyPS5 Studio handles `anyps5://` links, so Shortcuts (*Open URLs*), Raycast, Alfred or a terminal (`open 'anyps5://launch?title=PPSA02929'`) can start a title:
+12. **Storage.** *Measure* on the System page totals the disk use of the Library's output folders, their shader caches and saves, the save backups folder and the session logs, with buttons to show the last two in Finder. Game files linked into `app0/` are symlinks and are not counted.
+13. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
+14. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window. *Continue* at the top relaunches the most recently played title; *Launch Last Played* (⇧⌘L) in the Conversion menu does the same.
+15. **Links.** AnyPS5 Studio handles `anyps5://` links, so Shortcuts (*Open URLs*), Raycast, Alfred or a terminal (`open 'anyps5://launch?title=PPSA02929'`) can start a title:
     - `anyps5://launch?title=<title ID or title>` or `anyps5://launch/<title ID>` launches a converted Windows title. Title IDs are matched first, then titles, ignoring case; if several conversions match, the most recently used one wins.
     - `anyps5://library` opens the Library.
 

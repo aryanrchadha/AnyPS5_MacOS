@@ -14,6 +14,7 @@ struct SystemView: View {
                     PipelineCard().reveal(0.12)
                 }
                 UpdatesCard().reveal(0.14)
+                StorageCard().reveal(0.145)
                 DisplayCard().reveal(0.15)
                 LimitsCard().reveal(0.18)
             }
@@ -296,6 +297,7 @@ private struct LimitsCard: View {
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage(RelinkerLocator.overrideKey) private var relinkerOverride = ""
+    @AppStorage(SaveData.backupFolderKey) private var backupFolder = ""
 
     var body: some View {
         @Bindable var model = model
@@ -330,6 +332,35 @@ struct SettingsView: View {
             } header: {
                 Text("Wine launch environment")
             }
+            Section("Save backups") {
+                HStack {
+                    TextField("Documents/\(SaveData.backupFolderName)", text: $backupFolder)
+                        .font(.mono)
+                    Button("Choose…") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.canCreateDirectories = true
+                        if panel.runModal() == .OK, let url = panel.url { backupFolder = url.path }
+                    }
+                }
+                HStack {
+                    if let iCloud = SaveData.iCloudBackupRoot {
+                        Button("Use iCloud Drive") { backupFolder = iCloud.path }
+                    }
+                    Button("Use Default") { backupFolder = "" }
+                    Spacer()
+                    Button("Reveal") {
+                        let root = SaveData.backupRoot
+                        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+                        NSWorkspace.shared.open(root)
+                    }
+                }
+                Text("Backups go to \(SaveData.backupRoot.path)/<Title>/. Existing backups are not moved. Rebuild Applications launchers after changing this.")
+                    .font(.captionText)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Section("Conversion") {
                 LabeledContent("Switches") {
                     Button("Reset to Defaults") { model.resetSettings() }
@@ -342,5 +373,93 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .frame(width: 560)
         .onChange(of: relinkerOverride) { model.refreshEnvironment() }
+    }
+}
+
+private struct StorageCard: View {
+    @Environment(AppModel.self) private var model
+    @State var report: StorageReport?
+    @State var measuring = false
+
+    var body: some View {
+        BezelCard {
+            VStack(alignment: .leading, spacing: 16) {
+                CardHeader(eyebrow: "Storage", title: "Disk use",
+                           trailing: AnyView(GhostButton(title: measuring ? "Measuring…" : "Measure", symbol: "internaldrive") { measure() }
+                               .disabled(measuring)))
+                if let report {
+                    VStack(spacing: 0) {
+                        StorageRow(title: "Converted titles",
+                                   detail: report.titleCount == 1 ? "1 output folder, including its caches and saves" : "\(report.titleCount) output folders, including their caches and saves",
+                                   bytes: report.titles)
+                        Hairline()
+                        StorageRow(title: "Shader caches", detail: "shader_cache/ in each output folder; rebuilt on demand", bytes: report.shaderCaches)
+                        Hairline()
+                        StorageRow(title: "Save data", detail: "\(SaveData.folderName)/ in each output folder", bytes: report.saves)
+                        Hairline()
+                        StorageRow(title: "Save backups", detail: SaveData.backupRoot.path, bytes: report.saveBackups) {
+                            NSWorkspace.shared.open(SaveData.backupRoot)
+                        }
+                        Hairline()
+                        StorageRow(title: "Session logs", detail: SessionLog.root.path, bytes: report.sessionLogs) {
+                            NSWorkspace.shared.open(SessionLog.root)
+                        }
+                    }
+                } else {
+                    Text("Measure adds up the output folders in the Library, their shader caches and saves, save backups and session logs. Linked game files are not counted.")
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private func measure() {
+        measuring = true
+        let outputs = model.library.entries.map(\.output)
+        let backups = SaveData.backupRoot
+        let logs = SessionLog.root
+        Task {
+            let result = await Task.detached(priority: .utility) {
+                StorageReport.measure(outputs: outputs, backupRoot: backups, logRoot: logs)
+            }.value
+            report = result
+            measuring = false
+        }
+    }
+}
+
+private struct StorageRow: View {
+    let title: String
+    let detail: String
+    let bytes: Int64
+    var reveal: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(detail)
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 12)
+            Text(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))
+                .font(.system(size: 13, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(Theme.textSecondary)
+            if let reveal {
+                Button(action: reveal) { Image(systemName: "folder") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Theme.accent)
+                    .help("Show in Finder")
+            }
+        }
+        .padding(.vertical, 10)
     }
 }

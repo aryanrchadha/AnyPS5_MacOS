@@ -68,16 +68,17 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - The same rules as the runtime apply: `ToggleFullscreen` accepts keys only, the wheel maps only to pad buttons, and `#` and `;` cannot be bound because they start comments.
    - A binding shared by two actions is outlined in amber.
    - Lines the runtime would reject are listed before saving. Saving with no changes from the defaults removes the file.
-8. **Add to Applications.** Creates `~/Applications/AnyPS5/<Title>.app` for Windows output. It launches the title through the selected Wine runtime with the Settings environment, and uses the game's icon. Rebuild it after changing the runtime or the environment.
+8. **Add to Applications.** Creates `~/Applications/AnyPS5/<Title>.app` for Windows output. It launches the title through its Wine runtime with the Settings environment and the title's launch options, and uses the game's icon. Like a launch from Studio, it writes a session log and, when *Back up saves on launch* is on, backs up `_sd/` first. Standard output and standard error share the log, and its sessions are not counted in the Library's play time. Rebuild it after changing the runtime, the environment or the options.
 
 9. **Launch options.** *Options* on a Library card, or beside Launch in the Console, sets per-title settings applied over the Settings environment:
+   - the Wine runtime: *Default* follows the runtime chosen in the Console; picking an installed runtime pins it for this title. If a pinned runtime is uninstalled, the default is used and the Console says so;
    - the Metal Performance HUD (`MTL_HUD_ENABLED=1`), an on-screen frame rate and frame time overlay drawn by macOS;
    - disabling the shader cache (`ANYPS5_NO_SHADER_CACHE=1`);
    - quiet Wine logging (`WINEDEBUG=-all`), which turns off Wine's own debug channels. The title's output still appears; Wine's error messages do not, so leave it off when diagnosing a crash. A `WINEDEBUG` line in the extra variables takes precedence;
    - extra variables;
    - backing up saves on launch: before each launch from Studio, `_sd/` is archived as an `Auto` backup in `Documents/AnyPS5 Saves/<Title>/`. The newest 5 automatic backups are kept; manual backups are never removed.
 
-   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same environment settings but do not back up saves or write session logs.
+   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). Launchers created with *Add to Applications* use the same settings.
 
    Each launch from Studio writes its console output to `~/Library/Logs/AnyPS5 Studio/<Title>/Session <date>.log`, which Console.app can also open. Lines from standard error start with `!` and Studio's own notes with `#`. The newest 10 logs per title are kept. *Open last session log* is in the Options panel and the card's context menu.
 
@@ -95,6 +96,6 @@ The Controls page also lists connected game controllers. SDL uses the first one,
 
 Each conversion also produces a report (target, guest modules, system imports, NID references, AMD-only rewrites, and the failure reason if any). It appears in the Console and on Library cards. *Import fonts* copies `.otf`, `.ttf` and `.ttc` files into `anyps5-fonts/` (see [System fonts](USAGE.md#system-fonts)). When a title ID appears in [`COMPATIBILITY.md`](COMPATIBILITY.md), its tested status is shown on the Convert page.
 
-When the app is in the background, it posts a notification when a conversion or batch finishes, and the Dock icon shows how many titles remain.
+When the app is in the background, it posts a notification when a conversion or batch finishes, or when a title launched from Studio exits with a non-zero code. The Dock icon shows how many titles remain.
 
 The System page lists the chip, macOS version, Rosetta and Wine status, and the known gaps above.

@@ -362,9 +362,12 @@ final class AppModel {
     }
 
     private func launch(output: URL, target: TargetPlatform) {
-        guard target == .windows, let wine = selectedWine, !runner.state.isRunning else { return }
+        guard target == .windows, let wine = wineRuntime(for: output), !runner.state.isRunning else { return }
         route = .console
         let entry = library.entry(for: output)
+        if let pinned = entry?.launchProfile.wineRuntimePath, pinned != wine.executable.path {
+            runner.note("The runtime chosen for this title is not installed (\(pinned)); using \(wine.name).")
+        }
         if let entry, entry.launchProfile.backupSavesOnLaunch {
             backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
         }
@@ -383,7 +386,18 @@ final class AppModel {
             let title = entry?.title ?? output.deletingPathExtension().lastPathComponent
             let lines = self.runner.lines.filter { $0.id > firstLine }
             self.writeSessionLog(lines, title: title, titleId: entry?.titleId, started: started, duration: duration, exitCode: code)
+            if code != 0 {
+                SystemNotifier.post(title: "\(title) exited with code \(code)", body: "The session log has the full output.")
+            }
         }
+    }
+
+    func wineRuntime(for output: URL) -> WineRuntime? {
+        if let pinned = library.entry(for: output)?.launchProfile.wineRuntimePath,
+           let runtime = system.wineRuntimes.first(where: { $0.executable.path == pinned }) {
+            return runtime
+        }
+        return selectedWine
     }
 
     private func writeSessionLog(_ lines: [LogLine], title: String, titleId: String?, started: Date,
@@ -605,13 +619,17 @@ final class AppModel {
     }
 
     func createLauncher(title: String, titleId: String?, executable: URL, iconURL: URL?) {
-        guard let wine = selectedWine else {
+        guard let wine = wineRuntime(for: executable) else {
             banner = "Install CrossOver, Whisky or Wine to create a launcher."
             return
         }
+        let profile = library.entry(for: executable)?.launchProfile ?? LaunchProfile()
         do {
             let app = try LauncherBuilder.build(title: title, titleId: titleId, executable: executable,
-                                                wine: wine.executable, environment: launchEnvironment(for: executable))
+                                                wine: wine.executable, environment: launchEnvironment(for: executable),
+                                                logFolder: SessionLog.folder(title: title, titleId: titleId),
+                                                backupFolder: profile.backupSavesOnLaunch
+                                                    ? SaveData.backupFolder(title: title, titleId: titleId) : nil)
             if let iconURL, let image = NSImage(contentsOf: iconURL) {
                 NSWorkspace.shared.setIcon(image, forFile: app.path, options: [])
             }

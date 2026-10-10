@@ -44,6 +44,17 @@ struct LibraryView: View {
                         .help("Queue titles converted with an older relinker build")
                     }
                     GhostButton(title: "Forget missing", symbol: "trash") { model.library.removeMissing() }
+                    Menu {
+                        Button("Export Library…") { model.exportLibrary() }
+                            .disabled(model.library.entries.isEmpty)
+                        Button("Import Library…") { model.importLibrary() }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("Export or import the Library")
                 }
                 .reveal(0.04)
 

@@ -99,6 +99,9 @@ final class AppModel {
         if let saved = defaults.string(forKey: Keys.outputDirectory) {
             outputDirectory = URL(fileURLWithPath: saved, isDirectory: true)
         }
+        if let aside = library.setAside {
+            banner = "The Library file could not be read, so it was moved to \(aside.path) and the Library starts empty. Import it from there if it was an export, or send it with a bug report."
+        }
     }
 
     var outputExecutable: URL? {
@@ -872,6 +875,45 @@ final class AppModel {
                     self.refreshLayout()
                 }
             }
+        }
+    }
+
+    func exportLibrary() {
+        let panel = NSSavePanel()
+        panel.title = "Export Library"
+        panel.message = "Includes titles, launch options, play sessions and pins. Output folders and saves are not copied."
+        let day = ISO8601DateFormatter.string(from: Date(), timeZone: .current, formatOptions: [.withFullDate])
+        panel.nameFieldStringValue = "AnyPS5 Library \(day).json"
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try LibraryArchive.encoder.encode(library.archive(favorites: favorites)).write(to: url, options: .atomic)
+            runner.note("Exported \(library.entries.count) titles to \(url.path)")
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            banner = "Exporting the Library failed: \(error.localizedDescription)"
+        }
+    }
+
+    func importLibrary() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Library"
+        panel.message = "Titles are added or merged; nothing in the current Library is removed."
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let archive = try LibraryArchive.read(Data(contentsOf: url))
+            let result = library.merge(archive.entries)
+            favorites.formUnion(archive.favorites)
+            UserDefaults.standard.set(Array(favorites), forKey: Keys.favorites)
+            let missing = archive.entries.filter { !$0.outputExists }.count
+            banner = "Imported \(archive.entries.count) titles: \(result.added) added, \(result.updated) merged, \(result.unchanged) already up to date."
+                + (missing > 0 ? " \(missing) point to output folders that do not exist on this Mac." : "")
+        } catch let error as TitleDataError {
+            banner = "Importing the Library failed: \(error)"
+        } catch {
+            banner = "Importing the Library failed: the file is not an AnyPS5 Studio Library export."
         }
     }
 

@@ -24,11 +24,49 @@ struct LibraryEntry: Codable, Identifiable, Equatable {
     var lastSession: PlaySession? { sessions?.last }
 }
 
+struct LibraryArchive: Codable, Equatable {
+    static let currentVersion = 1
+
+    var version = LibraryArchive.currentVersion
+    var exportedAt: Date
+    var entries: [LibraryEntry]
+    var favorites: [String]
+
+    static var encoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return encoder
+    }
+
+    static var decoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
+    static func read(_ data: Data) throws -> LibraryArchive {
+        let archive = try decoder.decode(LibraryArchive.self, from: data)
+        guard archive.version <= currentVersion else {
+            throw TitleDataError.invalid("This export was made by a newer AnyPS5 Studio (format \(archive.version)).")
+        }
+        return archive
+    }
+}
+
+struct LibraryMergeResult: Equatable {
+    var added = 0
+    var updated = 0
+    var unchanged = 0
+}
+
 @Observable
 final class LibraryStore {
     private(set) var entries: [LibraryEntry] = []
+    private(set) var setAside: URL?
 
     @ObservationIgnored private let fileURL: URL
+    @ObservationIgnored private var savingBlocked = false
 
     init(directory: URL = LibraryStore.defaultDirectory) {
         fileURL = directory.appendingPathComponent("library.json")
@@ -76,6 +114,40 @@ final class LibraryStore {
         update(entry)
     }
 
+    @discardableResult
+    func merge(_ imported: [LibraryEntry]) -> LibraryMergeResult {
+        var result = LibraryMergeResult()
+        for incoming in imported {
+            guard let index = entries.firstIndex(where: { $0.output.standardizedFileURL == incoming.output.standardizedFileURL }) else {
+                var added = incoming
+                if entries.contains(where: { $0.id == added.id }) { added.id = UUID() }
+                entries.append(added)
+                result.added += 1
+                continue
+            }
+            var current = entries[index]
+            let before = current
+            if current.profile == nil { current.profile = incoming.profile }
+            let known = Set((current.sessions ?? []).map { "\($0.start.timeIntervalSince1970)|\($0.duration)" })
+            let extra = (incoming.sessions ?? []).filter { !known.contains("\($0.start.timeIntervalSince1970)|\($0.duration)") }
+            if !extra.isEmpty {
+                current.sessions = Array(((current.sessions ?? []) + extra).sorted { $0.start < $1.start }.suffix(200))
+            }
+            if current == before {
+                result.unchanged += 1
+            } else {
+                entries[index] = current
+                result.updated += 1
+            }
+        }
+        if result.added + result.updated > 0 { save() }
+        return result
+    }
+
+    func archive(favorites: Set<String>, now: Date = Date()) -> LibraryArchive {
+        LibraryArchive(exportedAt: now, entries: entries, favorites: favorites.sorted())
+    }
+
     func remove(_ entry: LibraryEntry) {
         entries.removeAll { $0.id == entry.id }
         save()
@@ -88,15 +160,25 @@ final class LibraryStore {
 
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        entries = (try? decoder.decode([LibraryEntry].self, from: data)) ?? []
+        do {
+            entries = try LibraryArchive.decoder.decode([LibraryEntry].self, from: data)
+        } catch {
+            let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+            let aside = fileURL.deletingLastPathComponent().appendingPathComponent("library.unreadable-\(stamp).json")
+            do {
+                try FileManager.default.moveItem(at: fileURL, to: aside)
+                setAside = aside
+            } catch {
+                savingBlocked = true
+                NSLog("AnyPS5 Studio: could not set the unreadable library aside: %@", error.localizedDescription)
+            }
+            NSLog("AnyPS5 Studio: the library could not be read: %@", String(describing: error))
+        }
     }
 
     private func save() {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard !savingBlocked else { return }
+        let encoder = LibraryArchive.encoder
         do {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try encoder.encode(entries).write(to: fileURL, options: .atomic)

@@ -9,6 +9,8 @@ struct TitleDataPanel: View {
     @State var entitlements = EntitlementsFile()
     @State var newLabel = ""
     @State var labelError: String?
+    @State var status: PlayStatus?
+    @State var notes = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -18,6 +20,43 @@ struct TitleDataPanel: View {
                     .font(.cardTitle)
                     .foregroundStyle(Theme.textPrimary)
             }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Status")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Picker("Status", selection: $status) {
+                        Text("Not set").tag(PlayStatus?.none)
+                        ForEach(PlayStatus.allCases) { status in
+                            Text(status.title).tag(Optional(status))
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 170)
+                }
+                if let status {
+                    Text(status.detail)
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                TextEditor(text: $notes)
+                    .font(.bodyText)
+                    .scrollContentBackground(.hidden)
+                    .frame(height: 70)
+                    .padding(8)
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.35)))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+                Text("Your notes on how the title runs on this Mac. They are searchable, kept on re-conversion, and included in exports and diagnostics.")
+                    .font(.captionText)
+                    .foregroundStyle(Theme.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .onChange(of: status) { _, _ in saveNotes() }
+            .onChange(of: notes) { _, _ in saveNotes() }
+
+            Hairline()
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -140,7 +179,17 @@ struct TitleDataPanel: View {
         }
     }
 
+    private func saveNotes() {
+        let current = model.library.entry(for: entry.output)
+        let trimmed = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard current?.status != status || (current?.notes ?? "") != trimmed else { return }
+        model.library.setStatus(status, notes: notes, for: entry.output)
+    }
+
     private func refresh() {
+        let current = model.library.entry(for: entry.output) ?? entry
+        status = current.status
+        notes = current.notes ?? ""
         saveSize = ShaderCache.size(at: SaveData.directory(besides: entry.output))
         backups = model.saveBackups(title: entry.title, titleId: entry.titleId)
         entitlements = model.loadEntitlements(for: entry.output)

@@ -1,6 +1,32 @@
 import Foundation
 import Observation
 
+enum PlayStatus: String, Codable, CaseIterable, Identifiable {
+    case nothing, boots, menus, inGame, playable
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .nothing: "Doesn't start"
+        case .boots: "Boots"
+        case .menus: "Menus"
+        case .inGame: "In game"
+        case .playable: "Playable"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .nothing: "Exits or crashes before showing anything"
+        case .boots: "Shows a window or splash, no menus"
+        case .menus: "Reaches menus but not gameplay"
+        case .inGame: "Gameplay starts, with serious issues"
+        case .playable: "Can be played through"
+        }
+    }
+}
+
 struct LibraryEntry: Codable, Identifiable, Equatable {
     var id = UUID()
     var title: String
@@ -15,6 +41,8 @@ struct LibraryEntry: Codable, Identifiable, Equatable {
     var profile: LaunchProfile?
     var sessions: [PlaySession]?
     var relinkerCommit: String?
+    var status: PlayStatus?
+    var notes: String?
 
     var succeeded: Bool { exitCode == 0 }
     var outputExists: Bool { FileManager.default.fileExists(atPath: output.path) }
@@ -84,6 +112,8 @@ final class LibraryStore {
         if let previous = self.entry(for: entry.output) {
             entry.profile = entry.profile ?? previous.profile
             entry.sessions = entry.sessions ?? previous.sessions
+            entry.status = entry.status ?? previous.status
+            entry.notes = entry.notes ?? previous.notes
         }
         entries.removeAll { $0.output.standardizedFileURL == entry.output.standardizedFileURL }
         entries.insert(entry, at: 0)
@@ -103,6 +133,14 @@ final class LibraryStore {
     func setProfile(_ profile: LaunchProfile, for output: URL) {
         guard var entry = entry(for: output) else { return }
         entry.profile = profile == LaunchProfile() ? nil : profile
+        update(entry)
+    }
+
+    func setStatus(_ status: PlayStatus?, notes: String?, for output: URL) {
+        guard var entry = entry(for: output) else { return }
+        let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        entry.status = status
+        entry.notes = (trimmed?.isEmpty ?? true) ? nil : trimmed
         update(entry)
     }
 
@@ -128,6 +166,8 @@ final class LibraryStore {
             var current = entries[index]
             let before = current
             if current.profile == nil { current.profile = incoming.profile }
+            if current.status == nil { current.status = incoming.status }
+            if current.notes == nil { current.notes = incoming.notes }
             let known = Set((current.sessions ?? []).map { "\($0.start.timeIntervalSince1970)|\($0.duration)" })
             let extra = (incoming.sessions ?? []).filter { !known.contains("\($0.start.timeIntervalSince1970)|\($0.duration)") }
             if !extra.isEmpty {

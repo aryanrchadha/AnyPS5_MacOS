@@ -39,8 +39,8 @@ struct LaunchOptionsPanel: View {
                           isOn: $profile.quietWine)
                 Hairline()
                 OptionRow(title: "Back up saves on launch",
-                          detail: "Archive the save folder before each launch. The newest \(SaveData.automaticRetention) automatic backups are kept.",
-                          flag: "\(SaveData.folderName) → Documents/AnyPS5 Saves",
+                          detail: "Archive the save folder to the Save backups folder in Settings before each launch. The newest \(SaveData.automaticRetention) automatic backups are kept.",
+                          flag: "\(SaveData.folderName) → \(SaveData.backupRoot.lastPathComponent)",
                           isOn: $profile.backupSavesOnLaunch)
                 Hairline()
                 VStack(alignment: .leading, spacing: 8) {

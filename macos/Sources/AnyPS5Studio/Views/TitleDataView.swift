@@ -41,7 +41,7 @@ struct TitleDataPanel: View {
                     GhostButton(title: "Reveal", symbol: "folder") { model.reveal(SaveData.directory(besides: entry.output)) }
                 }
                 if backups.isEmpty {
-                    Text("Backups are stored in Documents/AnyPS5 Saves.")
+                    Text("Backups are stored in \(SaveData.backupFolder(title: entry.title, titleId: entry.titleId).path).")
                         .font(.captionText)
                         .foregroundStyle(Theme.textTertiary)
                 } else {

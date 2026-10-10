@@ -71,6 +71,9 @@ struct ControlsView: View {
             VStack(alignment: .leading, spacing: 20) {
                 ControlsHeader(recorder: recorder).reveal(0.04)
                 ControllerStatus().reveal(0.05)
+                if !model.controllers.controllers.isEmpty {
+                    ControllerTesterCard().reveal(0.055)
+                }
                 if model.inputConfigDirectory != nil {
                     if !model.inputConfig.issues.isEmpty {
                         Callout(text: "The existing file has lines the runtime would reject. Saving rewrites the file without them.\n"
@@ -370,6 +373,119 @@ private struct PreviewCard: View {
                     .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.45)))
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
             }
+        }
+    }
+}
+
+private struct ControllerTesterCard: View {
+    @State var tester = ControllerTester()
+
+    var body: some View {
+        let snapshot = tester.snapshot
+        BezelCard {
+            VStack(alignment: .leading, spacing: 16) {
+                CardHeader(eyebrow: "Controller test", title: tester.controllerName ?? "Waiting for input")
+                if tester.controllerName != nil && !tester.hasExtendedProfile {
+                    Callout(text: "This controller does not report a full gamepad profile to macOS, so it cannot be tested here.")
+                } else {
+                    HStack(alignment: .top, spacing: 28) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(PadButton.groups, id: \.self) { group in
+                                HStack(spacing: 6) {
+                                    ForEach(group) { button in
+                                        PadButtonCell(label: button.label, pressed: snapshot.pressed.contains(button))
+                                    }
+                                }
+                            }
+                        }
+                        StickView(title: "Left stick", stick: snapshot.leftStick, note: snapshot.restNote(for: snapshot.leftStick))
+                        StickView(title: "Right stick", stick: snapshot.rightStick, note: snapshot.restNote(for: snapshot.rightStick))
+                        HStack(alignment: .bottom, spacing: 10) {
+                            TriggerBar(title: "L2", value: snapshot.l2)
+                            TriggerBar(title: "R2", value: snapshot.r2)
+                        }
+                    }
+                    Text("Reads the first controller, the one SDL uses, through macOS. Press buttons and move the sticks; a stick that stays off centre with your hands off can drift in games.")
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .onAppear { tester.start() }
+        .onDisappear { tester.stop() }
+    }
+}
+
+private struct PadButtonCell: View {
+    let label: String
+    let pressed: Bool
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .semibold))
+            .frame(minWidth: 44, minHeight: 26)
+            .padding(.horizontal, 4)
+            .foregroundStyle(pressed ? Color.black : Theme.textSecondary)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(pressed ? Theme.accent : Color.white.opacity(0.05)))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
+            .animation(Motion.snap, value: pressed)
+    }
+}
+
+private struct StickView: View {
+    let title: String
+    let stick: PadSnapshot.Stick
+    let note: String?
+
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                Circle().fill(Color.white.opacity(0.04))
+                Circle().strokeBorder(Theme.hairlineStrong, lineWidth: 1)
+                Circle()
+                    .stroke(Theme.hairline, lineWidth: 1)
+                    .frame(width: 84 * CGFloat(PadSnapshot.restThreshold), height: 84 * CGFloat(PadSnapshot.restThreshold))
+                Circle()
+                    .fill(note == nil ? Theme.accent : Theme.warning)
+                    .frame(width: 12, height: 12)
+                    .offset(x: CGFloat(stick.x) * 36, y: CGFloat(-stick.y) * 36)
+            }
+            .frame(width: 84, height: 84)
+            Text(title)
+                .font(.captionText)
+                .foregroundStyle(Theme.textSecondary)
+            Text(String(format: "%+.2f  %+.2f", stick.x, stick.y))
+                .font(.monoSmall)
+                .foregroundStyle(Theme.textTertiary)
+            if let note {
+                Text(note)
+                    .font(.captionText)
+                    .foregroundStyle(Theme.warning)
+            }
+        }
+    }
+}
+
+private struct TriggerBar: View {
+    let title: String
+    let value: Float
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.white.opacity(0.05))
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Theme.accent)
+                    .frame(height: 84 * CGFloat(max(0, min(1, value))))
+            }
+            .frame(width: 18, height: 84)
+            Text(title)
+                .font(.captionText)
+                .foregroundStyle(Theme.textSecondary)
+            Text(String(format: "%.2f", value))
+                .font(.monoSmall)
+                .foregroundStyle(Theme.textTertiary)
         }
     }
 }

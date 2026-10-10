@@ -102,7 +102,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 
     *Copy Launch Link* in a card's context menu copies the link for that title. Studio asks before launching from a link; choose *Launch from links without asking* in that dialog to skip the question later. Links never convert, delete or change anything.
 
-The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed.
+The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed. While a controller is connected, *Controller test* shows that controller live as macOS reports it: every button lights up when pressed, and it shows both stick positions and how far L2 and R2 are pulled. A stick that stays at least 0.10 off centre while nothing is pressed is marked, because it can drift in games. Controllers that do not report a full gamepad profile to macOS cannot be tested there.
 
 Each conversion also produces a report (target, guest modules, system imports, NID references, AMD-only rewrites, and the failure reason if any). It appears in the Console and on Library cards. *Import fonts* copies `.otf`, `.ttf` and `.ttc` files into `anyps5-fonts/` (see [System fonts](USAGE.md#system-fonts)). When a title ID appears in [`COMPATIBILITY.md`](COMPATIBILITY.md), its tested status is shown on the Convert page.
 

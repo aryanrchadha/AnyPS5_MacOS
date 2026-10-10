@@ -443,6 +443,55 @@ final class AppModel {
         lastPlayedEntry != nil && selectedWine != nil && !runner.state.isRunning
     }
 
+    static let confirmLinkLaunchKey = "confirmLinkLaunch"
+
+    func handle(_ link: StudioLink) {
+        switch link {
+        case .library:
+            route = .library
+        case .launch(let target):
+            guard let entry = StudioLink.match(target, in: library.entries) else {
+                route = .library
+                banner = "No converted title matches \u{201C}\(target)\u{201D}."
+                return
+            }
+            guard launchableEntries.contains(where: { $0.id == entry.id }), wineRuntime(for: entry.output) != nil else {
+                route = .library
+                banner = "\(entry.title) cannot be launched: it needs a successful Windows conversion, its output folder and a Wine runtime."
+                return
+            }
+            guard !runner.state.isRunning else {
+                banner = "\(entry.title) was not launched because another task is running."
+                return
+            }
+            guard confirmLinkLaunch(entry) else { return }
+            launch(entry)
+        }
+    }
+
+    private func confirmLinkLaunch(_ entry: LibraryEntry) -> Bool {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: Self.confirmLinkLaunchKey) != nil, !defaults.bool(forKey: Self.confirmLinkLaunchKey) { return true }
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Launch \(entry.title)?"
+        alert.informativeText = "An anyps5:// link asked AnyPS5 Studio to launch this title."
+        alert.addButton(withTitle: "Launch")
+        alert.addButton(withTitle: "Cancel")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Launch from links without asking"
+        let approved = alert.runModal() == .alertFirstButtonReturn
+        if approved, alert.suppressionButton?.state == .on { defaults.set(false, forKey: Self.confirmLinkLaunchKey) }
+        return approved
+    }
+
+    func copyLaunchLink(for entry: LibraryEntry) {
+        guard let url = StudioLink.launchURL(for: entry) else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.absoluteString, forType: .string)
+        runner.note("Copied \(url.absoluteString)")
+    }
+
     func launchLastPlayed() {
         guard let entry = lastPlayedEntry else { return }
         launch(entry)

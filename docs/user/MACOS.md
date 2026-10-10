@@ -87,10 +87,16 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
     - **Owned add-ons:** edits `anyps5-entitlements.ini`, the entitlement labels of add-ons you own, which the runtime reports as installed. Labels are up to 15 characters; `#` and `;` start comments.
 11. **Organise and clean up.**
     - The Library sorts by recent activity, title, play time or disk usage. Pinned titles stay on top.
+    - Once a title has been played, a card above the grid shows play time for the last 7 days: the total, the number of sessions, the most played titles, and a bar per day. Sessions count on the day they started. Launches from *Add to Applications* apps are not included.
     - *Move Conversion to Trash* removes a title's output folder, with the option to back up its saves first. It only acts on folders laid out by AnyPS5 Studio (`<name>/<name>.exe`).
     - *Export Diagnostics*, from a card or the System page, writes a text report with system details, the title's conversion report and sessions, and the console log, for bug reports. It contains file paths; review it before sharing.
 12. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
 13. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window. *Continue* at the top relaunches the most recently played title; *Launch Last Played* (⇧⌘L) in the Conversion menu does the same.
+14. **Links.** AnyPS5 Studio handles `anyps5://` links, so Shortcuts (*Open URLs*), Raycast, Alfred or a terminal (`open 'anyps5://launch?title=PPSA02929'`) can start a title:
+    - `anyps5://launch?title=<title ID or title>` or `anyps5://launch/<title ID>` launches a converted Windows title. Title IDs are matched first, then titles, ignoring case; if several conversions match, the most recently used one wins.
+    - `anyps5://library` opens the Library.
+
+    *Copy Launch Link* in a card's context menu copies the link for that title. Studio asks before launching from a link; choose *Launch from links without asking* in that dialog to skip the question later. Links never convert, delete or change anything.
 
 The Controls page also lists connected game controllers. SDL uses the first one, with no configuration needed.
 

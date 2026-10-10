@@ -1,3 +1,4 @@
+import Charts
 import AppKit
 import SwiftUI
 
@@ -26,6 +27,7 @@ struct LibraryView: View {
              title: "Converted titles",
              subtitle: "Every conversion is remembered here with its output, target and result. Reopen a title to convert it again with different switches.") {
             VStack(alignment: .leading, spacing: 20) {
+                BannerRow()
                 HStack(spacing: 12) {
                     GlassField(placeholder: "Search by title or title ID", text: $search)
                         .frame(maxWidth: 320)
@@ -64,6 +66,10 @@ struct LibraryView: View {
                     }
                     .reveal(0.08)
                 } else {
+                    if model.library.entries.contains(where: { !($0.sessions ?? []).isEmpty }) {
+                        ActivityCard(activity: PlayActivity(entries: model.library.entries))
+                            .reveal(0.06)
+                    }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 420), spacing: 20, alignment: .top)],
                               alignment: .leading, spacing: 20) {
                         ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
@@ -180,6 +186,8 @@ private struct LibraryCard: View {
             .disabled(!entry.outputExists)
             Button("Add to Applications") { model.createLauncher(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded || !entry.outputExists || model.selectedWine == nil)
+            Button("Copy Launch Link") { model.copyLaunchLink(for: entry) }
+                .disabled(entry.target != .windows || !entry.succeeded)
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
             Button("Open Last Session Log") { model.openLastSessionLog(for: entry) }
                 .disabled(entry.lastSession == nil)
@@ -218,5 +226,61 @@ private struct LibraryCard: View {
         .frame(width: 64, height: 64)
         .clipShape(shape)
         .overlay(shape.strokeBorder(Theme.hairlineStrong, lineWidth: 1))
+    }
+}
+
+struct ActivityCard: View {
+    let activity: PlayActivity
+
+    var body: some View {
+        BezelCard {
+            HStack(alignment: .top, spacing: 28) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Eyebrow(text: "Last 7 days", tint: Theme.accent)
+                    Text(PlayActivity.format(activity.total))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(activity.sessions == 1 ? "1 session" : "\(activity.sessions) sessions")
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textSecondary)
+                    ForEach(activity.titles.prefix(3)) { title in
+                        HStack(spacing: 8) {
+                            Text(title.title)
+                                .lineLimit(1)
+                                .foregroundStyle(Theme.textPrimary)
+                            Spacer(minLength: 8)
+                            Text(PlayActivity.format(title.duration))
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .font(.captionText)
+                    }
+                }
+                .frame(width: 220, alignment: .leading)
+
+                Chart(activity.days) { day in
+                    BarMark(x: .value("Day", day.start, unit: .day),
+                            y: .value("Minutes", day.duration / 60))
+                        .foregroundStyle(Theme.accent.gradient)
+                        .cornerRadius(4)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .day)) { _ in
+                        AxisValueLabel(format: .dateTime.weekday(.abbreviated), centered: true)
+                    }
+                }
+                .chartYAxis {
+                    AxisMarks(position: .trailing) { value in
+                        AxisGridLine().foregroundStyle(Theme.hairline)
+                        AxisValueLabel {
+                            if let minutes = value.as(Double.self) { Text("\(Int(minutes))m") }
+                        }
+                    }
+                }
+                .frame(height: 130)
+                .accessibilityLabel("Play time per day for the last 7 days")
+            }
+        }
     }
 }

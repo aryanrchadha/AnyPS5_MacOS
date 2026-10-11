@@ -488,6 +488,39 @@ final class AppModel {
         return approved
     }
 
+    private func confirm(_ message: String, detail: String, action: String) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.informativeText = detail
+        alert.addButton(withTitle: action)
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    @discardableResult
+    func clearAllShaderCaches() -> Bool {
+        guard !runner.state.isRunning else {
+            runner.note("Shader caches were not cleared because a title or conversion is running.")
+            return false
+        }
+        guard confirm("Clear every shader cache?",
+                      detail: "Deletes shader_cache/ in each Library output folder. Titles rebuild their caches when next launched, with more stutter at first.",
+                      action: "Clear Caches") else { return false }
+        let result = StorageCleanup.clearShaderCaches(outputs: library.entries.map(\.output))
+        runner.note("Cleared \(result.cleared) shader caches" + (result.failed.isEmpty ? "." : "; could not clear \(result.failed.joined(separator: ", "))."))
+        return true
+    }
+
+    @discardableResult
+    func deleteAllSessionLogs() -> Bool {
+        guard confirm("Delete all session logs?",
+                      detail: "Deletes the session logs in \(SessionLog.root.path). Play times in the Library are kept.",
+                      action: "Delete Logs") else { return false }
+        let deleted = StorageCleanup.deleteSessionLogs(root: SessionLog.root)
+        runner.note("Deleted \(deleted) session logs.")
+        return true
+    }
+
     func copyCompatibilityReport(for entry: LibraryEntry) {
         let report = CompatibilityReport(entry: entry,
                                          mac: "\(system.chip), \(system.memoryLabel)",

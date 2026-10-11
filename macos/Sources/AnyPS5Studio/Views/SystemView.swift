@@ -393,17 +393,17 @@ private struct StorageCard: View {
                                    detail: report.titleCount == 1 ? "1 output folder, including its caches and saves" : "\(report.titleCount) output folders, including their caches and saves",
                                    bytes: report.titles)
                         Hairline()
-                        StorageRow(title: "Shader caches", detail: "shader_cache/ in each output folder; rebuilt on demand", bytes: report.shaderCaches)
+                        StorageRow(title: "Shader caches", detail: "shader_cache/ in each output folder; rebuilt on demand", bytes: report.shaderCaches,
+                                   clearTitle: "Clear", clear: report.shaderCaches > 0 ? { if model.clearAllShaderCaches() { measure() } } : nil)
                         Hairline()
                         StorageRow(title: "Save data", detail: "\(SaveData.folderName)/ in each output folder", bytes: report.saves)
                         Hairline()
-                        StorageRow(title: "Save backups", detail: SaveData.backupRoot.path, bytes: report.saveBackups) {
-                            NSWorkspace.shared.open(SaveData.backupRoot)
-                        }
+                        StorageRow(title: "Save backups", detail: SaveData.backupRoot.path, bytes: report.saveBackups,
+                                   reveal: { NSWorkspace.shared.open(SaveData.backupRoot) })
                         Hairline()
-                        StorageRow(title: "Session logs", detail: SessionLog.root.path, bytes: report.sessionLogs) {
-                            NSWorkspace.shared.open(SessionLog.root)
-                        }
+                        StorageRow(title: "Session logs", detail: SessionLog.root.path, bytes: report.sessionLogs,
+                                   clearTitle: "Delete", clear: report.sessionLogs > 0 ? { if model.deleteAllSessionLogs() { measure() } } : nil,
+                                   reveal: { NSWorkspace.shared.open(SessionLog.root) })
                     }
                 } else {
                     Text("Measure adds up the output folders in the Library, their shader caches and saves, save backups and session logs. Linked game files are not counted.")
@@ -434,6 +434,8 @@ private struct StorageRow: View {
     let title: String
     let detail: String
     let bytes: Int64
+    var clearTitle = "Clear"
+    var clear: (() -> Void)?
     var reveal: (() -> Void)?
 
     var body: some View {
@@ -453,6 +455,12 @@ private struct StorageRow: View {
                 .font(.system(size: 13, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(Theme.textSecondary)
+            if let clear {
+                Button(clearTitle, action: clear)
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.warning)
+            }
             if let reveal {
                 Button(action: reveal) { Image(systemName: "folder") }
                     .buttonStyle(.plain)

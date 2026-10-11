@@ -42,7 +42,7 @@ struct LibraryView: View {
                     .labelsHidden()
                     .frame(maxWidth: 150)
                     Spacer()
-                    Text("\(model.library.entries.count) titles")
+                    Text(LibraryOrganizer.countText(shown: entries.count, total: model.library.entries.count))
                         .font(.captionText)
                         .foregroundStyle(Theme.textSecondary)
                     if !model.outdatedEntries.isEmpty {
@@ -89,6 +89,28 @@ struct LibraryView: View {
                        model.library.entries.contains(where: { !($0.sessions ?? []).isEmpty }) {
                         ActivityCard(activity: PlayActivity(entries: model.library.entries))
                             .reveal(0.06)
+                    }
+                    if entries.isEmpty {
+                        BezelCard(padding: 32) {
+                            VStack(spacing: 12) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 26, weight: .ultraLight))
+                                    .foregroundStyle(Theme.textTertiary)
+                                Text("No titles match")
+                                    .font(.sectionTitle)
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("Nothing in the Library matches the search and status filter.")
+                                    .font(.bodyText)
+                                    .foregroundStyle(Theme.textSecondary)
+                                GhostButton(title: "Clear search and filter", symbol: "xmark.circle") {
+                                    model.librarySearch = ""
+                                    model.libraryStatus = .all
+                                }
+                                .fixedSize()
+                                .padding(.top, 4)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 300, maximum: 420), spacing: 20, alignment: .top)],
                               alignment: .leading, spacing: 20) {

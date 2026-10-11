@@ -89,7 +89,7 @@ jobs:
             exit 1
           fi
           app="$PWD/build-macos/AnyPS5 Studio.app"
-          for page in convert library controls console system library/PPSA00001; do
+          for page in convert library controls console system library/PPSA00001 library/NO-SUCH-TITLE; do
             if ! open -a "$app" "anyps5://$page"; then
               echo "::error title=App launch::open could not deliver anyps5://$page to AnyPS5 Studio"
               kill "$pid"
@@ -100,8 +100,8 @@ jobs:
           done
           shots=$(ls page-*.png 2>/dev/null | wc -l | tr -d ' ')
           unique=$(for f in page-*.png; do [ -f "$f" ] && shasum "$f" | cut -d' ' -f1; done | sort -u | wc -l | tr -d ' ')
-          if [ "$shots" -eq 6 ] && [ "$unique" -lt 6 ]; then
-            echo "::error title=App launch::Only $unique of 6 page screenshots differ, so the page links did not all change the page"
+          if [ "$shots" -eq 7 ] && [ "$unique" -lt 7 ]; then
+            echo "::error title=App launch::Only $unique of 7 page screenshots differ, so the page links did not all change the page"
             kill "$pid"
             exit 1
           fi

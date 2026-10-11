@@ -48,6 +48,11 @@ enum LibraryStatusFilter: Hashable, Identifiable {
 }
 
 enum LibraryOrganizer {
+    static func countText(shown: Int, total: Int) -> String {
+        let noun = total == 1 ? "title" : "titles"
+        return shown == total ? "\(total) \(noun)" : "\(shown) of \(total) \(noun)"
+    }
+
     static func arrange(_ entries: [LibraryEntry], query: String, sort: LibrarySort,
                         favorites: Set<String>, sizes: [String: Int64] = [:],
                         status: LibraryStatusFilter = .all) -> [LibraryEntry] {

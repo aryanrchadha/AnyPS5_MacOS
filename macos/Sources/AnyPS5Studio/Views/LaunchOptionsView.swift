@@ -190,6 +190,7 @@ struct RuntimeRow: View {
 struct SessionSummary: View {
     @Environment(AppModel.self) private var model
     let entry: LibraryEntry
+    @State var crash: CrashSummary?
 
     var body: some View {
         let sessions = entry.sessions ?? []
@@ -204,6 +205,24 @@ struct SessionSummary: View {
                 Text("The last session exited with code \(last.exitCode). Its log has the full output.")
                     .font(.captionText)
                     .foregroundStyle(Theme.warning)
+                if let crash, !crash.findings.isEmpty {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(Array(crash.findings.enumerated()), id: \.offset) { _, finding in
+                            Text(finding.headline)
+                                .font(.mono)
+                                .foregroundStyle(Theme.textPrimary)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if let detail = finding.detail {
+                                Text(detail)
+                                    .font(.captionText)
+                                    .foregroundStyle(Theme.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
             }
             if !sessions.isEmpty {
                 Button("Open last session log") { model.openLastSessionLog(for: entry) }
@@ -212,6 +231,7 @@ struct SessionSummary: View {
                     .foregroundStyle(Theme.accent)
             }
         }
+        .task(id: sessions.count) { crash = model.lastCrash(for: entry) }
     }
 
     static func text(for entry: LibraryEntry) -> String {

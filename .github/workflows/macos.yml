@@ -69,6 +69,31 @@ jobs:
             grep -E 'error:|warning: icon|failed' app.log | head -20 | while IFS= read -r line; do echo "::error title=App build::$line"; done
           fi
           exit "$status"
+      - name: Launch AnyPS5 Studio.app
+        timeout-minutes: 3
+        run: |
+          reports="$HOME/Library/Logs/DiagnosticReports"
+          before=$(ls "$reports" 2>/dev/null | grep -c '^AnyPS5Studio' || true)
+          "build-macos/AnyPS5 Studio.app/Contents/MacOS/AnyPS5Studio" > launch.log 2>&1 &
+          pid=$!
+          sleep 20
+          screencapture -x launch.png || true
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" && status=0 || status=$?
+            echo "::error title=App launch::AnyPS5 Studio exited with status $status within 20 seconds"
+            tail -40 launch.log
+            exit 1
+          fi
+          kill "$pid"
+          wait "$pid" 2>/dev/null || true
+          sleep 2
+          after=$(ls "$reports" 2>/dev/null | grep -c '^AnyPS5Studio' || true)
+          if [ "$after" -gt "$before" ]; then
+            echo "::error title=App launch::A crash report for AnyPS5 Studio was written"
+            ls -t "$reports" | grep '^AnyPS5Studio' | head -1 | while IFS= read -r report; do head -60 "$reports/$report"; done
+            exit 1
+          fi
+          echo "AnyPS5 Studio ran for 20 seconds without exiting or crashing."
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -78,6 +103,8 @@ jobs:
             ctest.log
             swift-test.log
             app.log
+            launch.log
+            launch.png
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v7
         if: always()

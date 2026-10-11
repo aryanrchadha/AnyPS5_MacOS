@@ -60,8 +60,11 @@ private struct LogCard: View {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(text, forType: .string)
                     }
+                    .fixedSize()
                     GhostButton(title: "Save", symbol: "square.and.arrow.down") { model.saveLog() }
+                        .fixedSize()
                     GhostButton(title: "Clear", symbol: "trash") { model.runner.clear() }
+                        .fixedSize()
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)

@@ -49,6 +49,8 @@ private struct LogCard: View {
                     Toggle("Issues only", isOn: $issuesOnly.animation(Motion.snap))
                         .toggleStyle(.switch)
                         .controlSize(.mini)
+                        .lineLimit(1)
+                        .fixedSize()
                         .tint(Theme.accent)
                         .font(.captionText)
                         .foregroundStyle(Theme.textSecondary)

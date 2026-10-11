@@ -14,7 +14,7 @@ struct AnyPS5StudioApp: App {
         Window("AnyPS5 Studio", id: "main") {
             RootView()
                 .environment(model)
-                .frame(minWidth: 1120, minHeight: 760)
+                .frame(minWidth: 960, minHeight: 600)
                 .preferredColorScheme(.dark)
         }
         .windowStyle(.hiddenTitleBar)
@@ -80,6 +80,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated { NSApp.applicationIconImage = AppIconRenderer.image(scale: 0.5) }
         }
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            MainActor.assumeIsolated {
+                for window in NSApp.windows where window.isVisible && window.styleMask.contains(.titled) {
+                    guard let screen = window.screen ?? NSScreen.main,
+                          let fitted = WindowFit.frame(window.frame, in: screen.visibleFrame) else { continue }
+                    window.setFrame(fitted, display: true)
+                }
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {

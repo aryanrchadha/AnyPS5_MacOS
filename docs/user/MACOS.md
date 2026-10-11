@@ -36,7 +36,7 @@ bash macos/scripts/build-app.sh
 
 The script builds the relinker with `-DANYPS5_RELINKER_ONLY=ON`, builds the app with SwiftPM, assembles `build-macos/AnyPS5 Studio.app` with the relinker inside `Contents/MacOS/`, and signs both ad hoc.
 
-`swift test --package-path macos` runs the app's model tests: launch profiles, launchers (run with a stand-in Wine), save backups, session logs, the Library store, links, storage cleanup and reports. They need Xcode, because the Command Line Tools may not include XCTest, and they run in CI on every change under `macos/`.
+`swift test --package-path macos` runs the app's model tests: launch profiles, launchers (run with a stand-in Wine), save backups, session logs, the Library store, links, storage cleanup and reports. They need Xcode, because the Command Line Tools may not include XCTest, and they run in CI on every change under `macos/`. CI also starts the built app on an Apple Silicon runner for 20 seconds and fails if it exits or leaves a crash report; its output and a screenshot are in the `logs` artifact.
 
 | Variable              | Effect                                              |
 |-----------------------|-----------------------------------------------------|

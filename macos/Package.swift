@@ -8,6 +8,11 @@ let package = Package(
         .executableTarget(
             name: "AnyPS5Studio",
             path: "Sources/AnyPS5Studio"
-        )
+        ),
+        .testTarget(
+            name: "AnyPS5StudioTests",
+            dependencies: ["AnyPS5Studio"],
+            path: "Tests/AnyPS5StudioTests"
+        ),
     ]
 )

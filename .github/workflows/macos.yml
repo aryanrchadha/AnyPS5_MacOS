@@ -51,6 +51,15 @@ jobs:
             done
           fi
           exit "$status"
+      - name: Studio model tests
+        if: always()
+        run: |
+          swift test --package-path macos 2>&1 | tee swift-test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E 'error:|failed' swift-test.log | head -20 | while IFS= read -r line; do echo "::error title=Studio tests::$line"; done
+          fi
+          exit "$status"
       - name: Build AnyPS5 Studio.app
         if: always()
         run: |
@@ -67,6 +76,7 @@ jobs:
           path: |
             build-tests.log
             ctest.log
+            swift-test.log
             app.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v7

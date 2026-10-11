@@ -365,12 +365,16 @@ final class AppModel {
     }
 
     private func launch(output: URL, target: TargetPlatform) {
-        guard target == .windows, let wine = wineRuntime(for: output), !runner.state.isRunning else { return }
-        route = .console
+        guard target == .windows, !runner.state.isRunning else { return }
         let entry = library.entry(for: output)
-        if let pinned = entry?.launchProfile.wineRuntimePath, pinned != wine.executable.path {
-            runner.note("The runtime chosen for this title is not installed (\(pinned)); using \(wine.name).")
+        let check = preflight(for: output)
+        guard check.canLaunch, let wine = wineRuntime(for: output) else {
+            let title = entry?.title ?? output.deletingPathExtension().lastPathComponent
+            banner = "\(title) was not launched. " + check.failures.map(\.detail).joined(separator: " ")
+            return
         }
+        route = .console
+        for warning in check.warnings { runner.note(warning.detail) }
         if let entry, entry.launchProfile.backupSavesOnLaunch {
             backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
         }
@@ -393,6 +397,14 @@ final class AppModel {
                 SystemNotifier.post(title: "\(title) exited with code \(code)", body: "The session log has the full output.")
             }
         }
+    }
+
+    func preflight(for output: URL) -> LaunchPreflight {
+        let runtime = wineRuntime(for: output)
+        return LaunchPreflight(output: output, runtime: runtime?.executable, runtimeName: runtime?.name,
+                               pinnedRuntime: library.entry(for: output)?.launchProfile.wineRuntimePath,
+                               needsRosetta: system.isAppleSilicon && !system.rosettaInstalled,
+                               freeBytes: LaunchPreflight.freeBytes(near: output))
     }
 
     func wineRuntime(for output: URL) -> WineRuntime? {

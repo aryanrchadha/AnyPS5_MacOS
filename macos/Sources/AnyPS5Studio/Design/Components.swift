@@ -204,6 +204,8 @@ struct GlassSegmented<Value: Hashable & Identifiable>: View {
                     Text(label(option))
                         .font(.system(size: 12, weight: selected ? .semibold : .regular))
                         .foregroundStyle(selected ? Theme.textPrimary : Theme.textSecondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .frame(maxWidth: .infinity)

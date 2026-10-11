@@ -362,11 +362,11 @@ final class AppModel {
         launch(output: output, target: settings.target)
     }
 
-    func launch(_ entry: LibraryEntry) {
-        launch(output: entry.output, target: entry.target)
+    func launch(_ entry: LibraryEntry, diagnostic: Bool = false) {
+        launch(output: entry.output, target: entry.target, diagnostic: diagnostic)
     }
 
-    private func launch(output: URL, target: TargetPlatform) {
+    private func launch(output: URL, target: TargetPlatform, diagnostic: Bool = false) {
         guard target == .windows, !runner.state.isRunning else { return }
         let entry = library.entry(for: output)
         let check = preflight(for: output)
@@ -382,7 +382,10 @@ final class AppModel {
             backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
         }
         let firstLine = runner.lines.last?.id ?? -1
-        let environment = launchEnvironment(for: output)
+        let environment = diagnostic ? LaunchProfile.diagnostic(launchEnvironment(for: output)) : launchEnvironment(for: output)
+        if diagnostic {
+            runner.note("Wine error messages are on for this session only (WINEDEBUG=\(LaunchProfile.diagnosticWineDebug)).")
+        }
         let overrides = environment.keys.sorted().map { "\($0)=\(environment[$0] ?? "")" }.joined(separator: " ")
         if !overrides.isEmpty { runner.note("Environment: \(overrides)") }
         let started = Date()

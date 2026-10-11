@@ -52,6 +52,14 @@ final class LibraryStoreTests: XCTestCase {
 }
 
 final class LibraryOrganizerTests: XCTestCase {
+    func testCountText() {
+        XCTAssertEqual(LibraryOrganizer.countText(shown: 5, total: 5), "5 titles")
+        XCTAssertEqual(LibraryOrganizer.countText(shown: 1, total: 5), "1 of 5 titles")
+        XCTAssertEqual(LibraryOrganizer.countText(shown: 0, total: 5), "0 of 5 titles")
+        XCTAssertEqual(LibraryOrganizer.countText(shown: 1, total: 1), "1 title")
+        XCTAssertEqual(LibraryOrganizer.countText(shown: 0, total: 1), "0 of 1 title")
+    }
+
     func testStatusFilterAndSearch() {
         var noted = makeEntry("D", status: .playable)
         noted.notes = "audio crackle"

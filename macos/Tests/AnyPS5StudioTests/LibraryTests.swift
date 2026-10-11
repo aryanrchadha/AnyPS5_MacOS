@@ -98,7 +98,11 @@ final class StudioLinkTests: XCTestCase {
         func link(_ text: String) -> StudioLink? { URL(string: text).flatMap(StudioLink.init(url:)) }
         XCTAssertEqual(link("anyps5://launch/PPSA02929"), .launch("PPSA02929"))
         XCTAssertEqual(link("ANYPS5://Launch?Title=Dreaming%20Sarah"), .launch("Dreaming Sarah"))
-        XCTAssertEqual(link("anyps5://library"), .library)
+        XCTAssertEqual(link("anyps5://library"), .page("library"))
+        XCTAssertEqual(link("anyps5://System"), .page("system"))
+        XCTAssertEqual(StudioLink.pages.compactMap { link("anyps5://\($0)") }.count, 5)
+        XCTAssertNil(link("anyps5://console/extra"))
+        XCTAssertNil(link("anyps5://settings"))
         XCTAssertNil(link("anyps5://launch?title=%20"))
         XCTAssertNil(link("anyps5://delete/x"))
         XCTAssertNil(link("https://launch/x"))

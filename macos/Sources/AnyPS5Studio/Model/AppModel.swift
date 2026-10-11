@@ -478,8 +478,8 @@ final class AppModel {
 
     func handle(_ link: StudioLink) {
         switch link {
-        case .library:
-            route = .library
+        case .page(let name):
+            route = Route(rawValue: name) ?? .library
         case .launch(let target):
             guard let entry = StudioLink.match(target, in: library.entries) else {
                 route = .library

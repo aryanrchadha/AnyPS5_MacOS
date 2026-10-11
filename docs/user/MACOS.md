@@ -36,7 +36,7 @@ bash macos/scripts/build-app.sh
 
 The script builds the relinker with `-DANYPS5_RELINKER_ONLY=ON`, builds the app with SwiftPM, assembles `build-macos/AnyPS5 Studio.app` with the relinker inside `Contents/MacOS/`, and signs both ad hoc.
 
-`swift test --package-path macos` runs the app's model tests: launch profiles, launchers (run with a stand-in Wine), save backups, session logs, the Library store, links, storage cleanup and reports. They need Xcode, because the Command Line Tools may not include XCTest, and they run in CI on every change under `macos/`. CI also starts the built app on an Apple Silicon runner for 20 seconds and fails if it exits or leaves a crash report; its output and a screenshot are in the `logs` artifact.
+`swift test --package-path macos` runs the app's model tests: launch profiles, launchers (run with a stand-in Wine), save backups, session logs, the Library store, links, storage cleanup and reports. They need Xcode, because the Command Line Tools may not include XCTest, and they run in CI on every change under `macos/`. CI also starts the built app on an Apple Silicon runner, waits 20 seconds, opens each page through its `anyps5://` link, and fails if the app exits or leaves a crash report; its output and a screenshot of the launch and of each page are in the `logs` artifact.
 
 | Variable              | Effect                                              |
 |-----------------------|-----------------------------------------------------|
@@ -106,7 +106,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 14. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window. *Continue* at the top relaunches the most recently played title; *Launch Last Played* (⇧⌘L) in the Conversion menu does the same.
 15. **Links.** AnyPS5 Studio handles `anyps5://` links, so Shortcuts (*Open URLs*), Raycast, Alfred or a terminal (`open 'anyps5://launch?title=PPSA02929'`) can start a title:
     - `anyps5://launch?title=<title ID or title>` or `anyps5://launch/<title ID>` launches a converted Windows title. Title IDs are matched first, then titles, ignoring case; if several conversions match, the most recently used one wins.
-    - `anyps5://library` opens the Library.
+    - `anyps5://convert`, `anyps5://library`, `anyps5://controls`, `anyps5://console` and `anyps5://system` open that page.
 
     *Copy Launch Link* in a card's context menu copies the link for that title. Studio asks before launching from a link; choose *Launch from links without asking* in that dialog to skip the question later. Links never convert, delete or change anything.
 

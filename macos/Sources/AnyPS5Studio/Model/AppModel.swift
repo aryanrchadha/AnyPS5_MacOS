@@ -397,7 +397,12 @@ final class AppModel {
             let lines = self.runner.lines.filter { $0.id > firstLine }
             self.writeSessionLog(lines, title: title, titleId: entry?.titleId, started: started, duration: duration, exitCode: code)
             if code != 0 {
-                SystemNotifier.post(title: "\(title) exited with code \(code)", body: "The session log has the full output.")
+                let crash = CrashSummary(lines: lines.filter { $0.source != .system }.map(\.text))
+                for finding in crash.findings {
+                    self.runner.note("Likely cause: \(finding.headline)" + (finding.detail.map { " \u{2014} \($0)" } ?? ""))
+                }
+                SystemNotifier.post(title: "\(title) exited with code \(code)",
+                                    body: crash.headline ?? "The session log has the full output.")
             }
         }
     }
@@ -437,6 +442,11 @@ final class AppModel {
 
     func lastSessionLog(for entry: LibraryEntry) -> URL? {
         SessionLog.logs(in: SessionLog.folder(title: entry.title, titleId: entry.titleId)).first
+    }
+
+    func lastCrash(for entry: LibraryEntry) -> CrashSummary? {
+        guard let last = entry.sessions?.last, last.exitCode != 0, let log = lastSessionLog(for: entry) else { return nil }
+        return CrashSummary.read(log: log)
     }
 
     func openLastSessionLog(for entry: LibraryEntry) {
@@ -541,7 +551,8 @@ final class AppModel {
                                          mac: "\(system.chip), \(system.memoryLabel)",
                                          macOS: system.macOSLabel,
                                          runtime: entry.target == .windows ? wineRuntime(for: entry.output)?.name : nil,
-                                         appVersion: appVersion)
+                                         appVersion: appVersion,
+                                         crash: lastCrash(for: entry))
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report.markdown, forType: .string)
         runner.note("Copied the compatibility report for \(entry.title)")

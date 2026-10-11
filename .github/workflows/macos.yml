@@ -84,6 +84,17 @@ jobs:
             tail -40 launch.log
             exit 1
           fi
+          for page in convert library controls console system; do
+            open -a "build-macos/AnyPS5 Studio.app" "anyps5://$page" || echo "::warning title=App launch::Could not open anyps5://$page"
+            sleep 3
+            screencapture -x "page-$page.png" || true
+          done
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" && status=0 || status=$?
+            echo "::error title=App launch::AnyPS5 Studio exited with status $status while showing its pages"
+            tail -40 launch.log
+            exit 1
+          fi
           kill "$pid"
           wait "$pid" 2>/dev/null || true
           sleep 2
@@ -93,7 +104,7 @@ jobs:
             ls -t "$reports" | grep '^AnyPS5Studio' | head -1 | while IFS= read -r report; do head -60 "$reports/$report"; done
             exit 1
           fi
-          echo "AnyPS5 Studio ran for 20 seconds without exiting or crashing."
+          echo "AnyPS5 Studio ran for 20 seconds and showed each page without exiting or crashing."
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -105,6 +116,7 @@ jobs:
             app.log
             launch.log
             launch.png
+            page-*.png
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v7
         if: always()

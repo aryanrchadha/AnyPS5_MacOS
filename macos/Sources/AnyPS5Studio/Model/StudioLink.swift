@@ -3,8 +3,10 @@ import Foundation
 enum StudioLink: Equatable {
     static let scheme = "anyps5"
 
+    static let pages = ["convert", "library", "controls", "console", "system"]
+
     case launch(String)
-    case library
+    case page(String)
 
     init?(url: URL) {
         guard url.scheme?.lowercased() == Self.scheme,
@@ -14,8 +16,8 @@ enum StudioLink: Equatable {
         let query = components.queryItems?.first { $0.name.lowercased() == "title" }?.value
         let target = (path.first ?? query)?.trimmingCharacters(in: .whitespacesAndNewlines)
         switch action {
-        case "library" where target == nil:
-            self = .library
+        case _ where Self.pages.contains(action) && target == nil:
+            self = .page(action)
         case "launch":
             guard let target, !target.isEmpty else { return nil }
             self = .launch(target)

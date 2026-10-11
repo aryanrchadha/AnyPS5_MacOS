@@ -133,6 +133,10 @@ private struct LibraryCard: View {
                                  symbol: entry.succeeded ? "checkmark" : "xmark",
                                  tint: entry.succeeded ? Theme.success : Theme.failure)
                             Chip(text: entry.target.title, symbol: entry.target.symbol)
+                            if let status = entry.status {
+                                Chip(text: status.title, symbol: status.symbol, tint: status.tint)
+                                    .help(status.detail)
+                            }
                             if model.isOutdated(entry) {
                                 Chip(text: "Older relinker", symbol: "clock.arrow.circlepath", tint: Theme.warning)
                                     .help("Converted with relinker \(entry.relinkerCommit.map { String($0.prefix(8)) } ?? "?"); this app bundles \(model.build.shortCommit ?? "?")")
@@ -161,6 +165,13 @@ private struct LibraryCard: View {
                             .font(.captionText)
                             .foregroundStyle(Theme.textTertiary)
                             .lineLimit(1)
+                    }
+                    if let notes = entry.notes, let first = notes.split(separator: "\n").first {
+                        Text(first)
+                            .font(.captionText)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                            .help(notes)
                     }
                     if let summary = reportSummary {
                         Text(summary)
@@ -197,6 +208,16 @@ private struct LibraryCard: View {
             .disabled(!entry.outputExists)
             Button("Add to Applications") { model.createLauncher(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded || !entry.outputExists || model.selectedWine == nil)
+            Menu("Status") {
+                ForEach(PlayStatus.allCases) { status in
+                    Button(entry.status == status ? "✓ \(status.title)" : status.title) {
+                        model.library.setStatus(status, notes: entry.notes, for: entry.output)
+                    }
+                }
+                Divider()
+                Button("Clear") { model.library.setStatus(nil, notes: entry.notes, for: entry.output) }
+                    .disabled(entry.status == nil)
+            }
             Button("Copy Launch Link") { model.copyLaunchLink(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded)
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
@@ -292,6 +313,27 @@ struct ActivityCard: View {
                 .frame(height: 130)
                 .accessibilityLabel("Play time per day for the last 7 days")
             }
+        }
+    }
+}
+
+extension PlayStatus {
+    var symbol: String {
+        switch self {
+        case .nothing: "xmark.octagon"
+        case .boots: "power"
+        case .menus: "list.bullet"
+        case .inGame: "gamecontroller"
+        case .playable: "checkmark.seal"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .nothing: Theme.failure
+        case .boots, .menus: Theme.warning
+        case .inGame: Theme.accent
+        case .playable: Theme.success
         }
     }
 }

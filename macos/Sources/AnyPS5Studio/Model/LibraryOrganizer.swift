@@ -21,6 +21,8 @@ enum LibraryOrganizer {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         let filtered = trimmed.isEmpty ? entries : entries.filter {
             $0.title.localizedCaseInsensitiveContains(trimmed) || ($0.titleId ?? "").localizedCaseInsensitiveContains(trimmed)
+                || ($0.notes ?? "").localizedCaseInsensitiveContains(trimmed)
+                || ($0.status?.title ?? "").localizedCaseInsensitiveContains(trimmed)
         }
         let sorted: [LibraryEntry]
         switch sort {
@@ -77,7 +79,9 @@ struct DiagnosticsReport {
                       "Target: \(entry.target.title)",
                       "Output: \(entry.output.path)",
                       "Converted: \(ISO8601DateFormatter().string(from: entry.convertedAt))",
-                      "Exit code: \(entry.exitCode)"]
+                      "Exit code: \(entry.exitCode)",
+                      "Status: \(entry.status?.title ?? "not set")"]
+            if let notes = entry.notes { lines += notes.split(separator: "\n", omittingEmptySubsequences: false).map { "Notes: \($0)" } }
             if let report = entry.report {
                 lines.append("Guest modules: \(report.guestModules)")
                 if let external = report.externalReferences { lines.append("System imports: \(external)") }

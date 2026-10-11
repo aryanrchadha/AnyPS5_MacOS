@@ -39,6 +39,14 @@ struct LaunchProfile: Codable, Equatable {
     func merged(over base: [String: String]) -> [String: String] {
         base.merging(environment) { _, profile in profile }
     }
+
+    static let diagnosticWineDebug = "fixme-all"
+
+    static func diagnostic(_ environment: [String: String]) -> [String: String] {
+        var result = environment
+        result["WINEDEBUG"] = diagnosticWineDebug
+        return result
+    }
 }
 
 struct PlaySession: Codable, Equatable {

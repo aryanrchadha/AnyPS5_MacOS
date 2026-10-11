@@ -223,6 +223,11 @@ struct SessionSummary: View {
                     }
                     .padding(.top, 2)
                 }
+                Button("Launch again with Wine errors") { model.launch(entry, diagnostic: true) }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+                    .disabled(model.runner.state.isRunning)
             }
             if !sessions.isEmpty {
                 Button("Open last session log") { model.openLastSessionLog(for: entry) }

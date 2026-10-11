@@ -17,6 +17,13 @@ final class LaunchProfileTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(LaunchProfile.self, from: JSONEncoder().encode(profile)), profile)
     }
 
+    func testDiagnosticEnvironmentTurnsOnWineErrors() {
+        let profile = LaunchProfile(metalHUD: true, extraEnvironment: "WINEDEBUG=-all\nFOO=1", quietWine: true)
+        let environment = LaunchProfile.diagnostic(profile.merged(over: ["WINEDEBUG": "-all", "WINEESYNC": "1"]))
+        XCTAssertEqual(environment, ["WINEDEBUG": "fixme-all", "WINEESYNC": "1", "FOO": "1", "MTL_HUD_ENABLED": "1"])
+        XCTAssertEqual(LaunchProfile.diagnostic([:]), ["WINEDEBUG": "fixme-all"])
+    }
+
     func testEnvironmentPrecedence() {
         var profile = LaunchProfile(quietWine: true)
         XCTAssertEqual(profile.environment, ["WINEDEBUG": "-all"])

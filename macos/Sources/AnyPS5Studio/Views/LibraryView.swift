@@ -233,6 +233,8 @@ private struct LibraryCard: View {
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
             Button("Open Last Session Log") { model.openLastSessionLog(for: entry) }
                 .disabled(entry.lastSession == nil)
+            Button("Launch with Wine Errors") { model.launch(entry, diagnostic: true) }
+                .disabled(!model.launchableEntries.contains { $0.id == entry.id } || model.runner.state.isRunning)
             Button("Export Diagnostics…") { model.exportDiagnostics(for: entry) }
             Divider()
             Button("Remove from Library", role: .destructive) { model.library.remove(entry) }

@@ -7,6 +7,7 @@ enum StudioLink: Equatable {
 
     case launch(String)
     case page(String)
+    case library(String)
 
     init?(url: URL) {
         guard url.scheme?.lowercased() == Self.scheme,
@@ -18,6 +19,9 @@ enum StudioLink: Equatable {
         switch action {
         case _ where Self.pages.contains(action) && target == nil:
             self = .page(action)
+        case "library":
+            guard let target, !target.isEmpty, path.count <= 1 else { return nil }
+            self = .library(target)
         case "launch":
             guard let target, !target.isEmpty else { return nil }
             self = .launch(target)
@@ -31,9 +35,17 @@ enum StudioLink: Equatable {
     }
 
     static func launchURL(for entry: LibraryEntry) -> URL? {
+        url("launch", for: entry)
+    }
+
+    static func libraryURL(for entry: LibraryEntry) -> URL? {
+        url("library", for: entry)
+    }
+
+    private static func url(_ action: String, for entry: LibraryEntry) -> URL? {
         var components = URLComponents()
         components.scheme = scheme
-        components.host = "launch"
+        components.host = action
         let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         guard let value = identifier(for: entry).addingPercentEncoding(withAllowedCharacters: unreserved) else { return nil }
         components.percentEncodedQuery = "title=" + value

@@ -7,6 +7,7 @@ struct LaunchOptionsPanel: View {
     @State var profile = LaunchProfile()
     @State var cache: (files: Int, bytes: Int64) = (0, 0)
     @State var loaded = false
+    @State var preflight: LaunchPreflight?
 
     var body: some View {
         let entry = model.library.entry(for: output)
@@ -21,6 +22,10 @@ struct LaunchOptionsPanel: View {
             if entry == nil {
                 Callout(text: "Convert this title first. Options are stored with its Library entry.")
             } else {
+                if let preflight {
+                    PreflightList(preflight: preflight)
+                    Hairline()
+                }
                 RuntimeRow(selection: $profile.wineRuntimePath)
                 Hairline()
                 OptionRow(title: "Metal Performance HUD",
@@ -89,11 +94,61 @@ struct LaunchOptionsPanel: View {
             guard !loaded else { return }
             profile = entry?.launchProfile ?? LaunchProfile()
             cache = model.shaderCacheSize(for: output)
+            preflight = model.preflight(for: output)
             loaded = true
         }
         .onChange(of: profile) { _, newValue in
             guard loaded else { return }
             model.setProfile(newValue, for: output)
+            preflight = model.preflight(for: output)
+        }
+    }
+}
+
+struct PreflightList: View {
+    let preflight: LaunchPreflight
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                StatusDot(color: Self.color(preflight.level))
+                Text(preflight.summary)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            ForEach(preflight.checks) { check in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: Self.symbol(check.level))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Self.color(check.level))
+                        .frame(width: 14)
+                    Text(check.title)
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(width: 92, alignment: .leading)
+                    Text(check.detail)
+                        .font(.captionText)
+                        .foregroundStyle(check.level == .ok ? Theme.textTertiary : Self.color(check.level))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+    }
+
+    static func color(_ level: PreflightLevel) -> Color {
+        switch level {
+        case .ok: return Theme.success
+        case .warning: return Theme.warning
+        case .failure: return Theme.failure
+        }
+    }
+
+    static func symbol(_ level: PreflightLevel) -> String {
+        switch level {
+        case .ok: return "checkmark"
+        case .warning: return "exclamationmark.triangle.fill"
+        case .failure: return "xmark"
         }
     }
 }

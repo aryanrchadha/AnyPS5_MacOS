@@ -77,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         if Bundle.main.object(forInfoDictionaryKey: "CFBundleIconFile") == nil {
-            NSApp.applicationIconImage = MainActor.assumeIsolated { AppIconRenderer.image(scale: 0.5) }
+            MainActor.assumeIsolated { NSApp.applicationIconImage = AppIconRenderer.image(scale: 0.5) }
         }
         NSApp.activate(ignoringOtherApps: true)
     }

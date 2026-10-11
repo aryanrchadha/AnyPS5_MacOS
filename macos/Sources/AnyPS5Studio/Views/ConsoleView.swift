@@ -9,6 +9,7 @@ struct ConsoleView: View {
              title: "Relinker output",
              subtitle: "Live output from the relinker and from launched titles. Exit code 0 is success, 1 means rejected arguments, 2 means the conversion failed.",
              scrolls: false) {
+            BannerRow()
             WeightedRow(weights: [1.75, 1]) {
                 LogCard().reveal(0.05)
                 VStack(spacing: 20) {

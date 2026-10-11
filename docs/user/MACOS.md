@@ -64,6 +64,8 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - *Link game files* symlinks the game's resources into `app0/` without copying. Module folders are skipped, because the relinker writes converted modules there.
 6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,).
 
+   Every launch from Studio, the menu bar or a link is checked first. A missing executable, a missing or non-executable Wine runtime, Rosetta 2 not installed on Apple Silicon, or a read-only output folder stops the launch and the banner says why. A pinned runtime that is no longer installed, or less than 2 GB free on the output volume, is noted in the Console and the launch goes ahead. The Options panel shows the same checks at the top.
+
 7. **Controls.** Edits [`anyps5-input.ini`](INPUT_MAPPING.md) beside a converted title.
    - Every action shows its current keyboard and mouse bindings, with the built-in defaults until changed.
    - *Key* records the next key press, modifier keys included. Mouse buttons and wheel directions come from the mouse menu.
@@ -73,7 +75,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 8. **Add to Applications.** Creates `~/Applications/AnyPS5/<Title>.app` for Windows output. It launches the title through its Wine runtime with the Settings environment and the title's launch options, and uses the game's icon. Like a launch from Studio, it writes a session log and, when *Back up saves on launch* is on, backs up `_sd/` first. Standard output and standard error share the log, and its sessions are not counted in the Library's play time. Rebuild it after changing the runtime, the environment or the options.
 
 9. **Launch options.** *Options* on a Library card, or beside Launch in the Console, sets per-title settings applied over the Settings environment:
-   - the Wine runtime: *Default* follows the runtime chosen in the Console; picking an installed runtime pins it for this title. If a pinned runtime is uninstalled, the default is used and the Console says so;
+   - the Wine runtime: *Default* follows the runtime chosen in the Console; picking an installed runtime pins it for this title. If a pinned runtime is uninstalled, the default is used and the pre-launch check warns about it;
    - the Metal Performance HUD (`MTL_HUD_ENABLED=1`), an on-screen frame rate and frame time overlay drawn by macOS;
    - disabling the shader cache (`ANYPS5_NO_SHADER_CACHE=1`);
    - quiet Wine logging (`WINEDEBUG=-all`), which turns off Wine's own debug channels. The title's output still appears; Wine's error messages do not, so leave it off when diagnosing a crash. A `WINEDEBUG` line in the extra variables takes precedence;

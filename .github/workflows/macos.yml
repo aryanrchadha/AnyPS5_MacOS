@@ -84,11 +84,23 @@ jobs:
             tail -40 launch.log
             exit 1
           fi
+          app="$PWD/build-macos/AnyPS5 Studio.app"
           for page in convert library controls console system; do
-            open -a "build-macos/AnyPS5 Studio.app" "anyps5://$page" || echo "::warning title=App launch::Could not open anyps5://$page"
+            if ! open -a "$app" "anyps5://$page"; then
+              echo "::error title=App launch::open could not deliver anyps5://$page to AnyPS5 Studio"
+              kill "$pid"
+              exit 1
+            fi
             sleep 3
             screencapture -x "page-$page.png" || true
           done
+          shots=$(ls page-*.png 2>/dev/null | wc -l | tr -d ' ')
+          unique=$(for f in page-*.png; do [ -f "$f" ] && shasum "$f" | cut -d' ' -f1; done | sort -u | wc -l | tr -d ' ')
+          if [ "$shots" -eq 5 ] && [ "$unique" -lt 5 ]; then
+            echo "::error title=App launch::Only $unique of 5 page screenshots differ, so the page links did not all change the page"
+            kill "$pid"
+            exit 1
+          fi
           if ! kill -0 "$pid" 2>/dev/null; then
             wait "$pid" && status=0 || status=$?
             echo "::error title=App launch::AnyPS5 Studio exited with status $status while showing its pages"

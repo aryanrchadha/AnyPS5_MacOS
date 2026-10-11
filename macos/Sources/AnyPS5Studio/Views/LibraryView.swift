@@ -137,7 +137,7 @@ private struct LibraryCard: View {
                         Text(entry.titleId ?? entry.source.deletingLastPathComponent().lastPathComponent)
                             .font(.monoSmall)
                             .foregroundStyle(Theme.textTertiary)
-                        HStack(spacing: 6) {
+                        FlowRow {
                             Chip(text: entry.succeeded ? "Converted" : "Exit \(entry.exitCode)",
                                  symbol: entry.succeeded ? "checkmark" : "xmark",
                                  tint: entry.succeeded ? Theme.success : Theme.failure)

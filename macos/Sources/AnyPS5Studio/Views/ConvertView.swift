@@ -102,7 +102,7 @@ private struct SourceCard: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
-                    HStack(spacing: 8) {
+                    FlowRow(spacing: 8) {
                         Chip(text: inspection.kind.label,
                              symbol: inspection.kind.isConvertible ? "checkmark" : "xmark",
                              tint: inspection.kind.isConvertible ? Theme.success : Theme.failure)

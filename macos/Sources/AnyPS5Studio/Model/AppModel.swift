@@ -35,6 +35,7 @@ struct RuntimeLayout: Equatable {
     var appDirectoryExists: Bool
     var appEntryCount: Int
     var fontsPresent: Bool
+    var fontsShared = false
 
     var isComplete: Bool { executableExists && libraryCount > 0 && appDirectoryExists }
 }
@@ -64,6 +65,7 @@ final class AppModel {
     private(set) var layout: RuntimeLayout?
     var selectedWine: WineRuntime?
     var banner: String?
+    var sharedFontCount = SharedFonts.fonts(in: SharedFonts.defaultFolder).count
 
     private(set) var lastReport: ConversionReport?
     private(set) var favorites: Set<String> = Set(UserDefaults.standard.stringArray(forKey: Keys.favorites) ?? [])
@@ -375,6 +377,7 @@ final class AppModel {
         }
         route = .console
         for warning in check.warnings { runner.note(warning.detail) }
+        linkSharedFonts(besides: output)
         if let entry, entry.launchProfile.backupSavesOnLaunch {
             backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
         }
@@ -684,46 +687,59 @@ final class AppModel {
         }
     }
 
-    func importFonts() {
-        guard let output = outputExecutable else { return }
-        let destination = output.deletingLastPathComponent().appendingPathComponent("anyps5-fonts", isDirectory: true)
+    private func chooseFonts() -> [URL]? {
         let panel = NSOpenPanel()
         panel.title = "Choose font files or a folder of fonts"
         panel.message = "Console fonts (SST-*.otf) or Noto substitutes (NotoSans-*.ttf, NotoSansCJK-*.ttc)."
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        guard panel.runModal() == .OK else { return }
+        guard panel.runModal() == .OK else { return nil }
+        let fonts = SharedFonts.collect(from: panel.urls)
+        if fonts.isEmpty { banner = "No .otf, .ttf or .ttc files were selected." }
+        return fonts.isEmpty ? nil : fonts
+    }
 
-        let manager = FileManager.default
-        let extensions: Set<String> = ["otf", "ttf", "ttc"]
-        var fonts: [URL] = []
-        for url in panel.urls {
-            var isDirectory: ObjCBool = false
-            _ = manager.fileExists(atPath: url.path, isDirectory: &isDirectory)
-            if isDirectory.boolValue {
-                fonts += ((try? manager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [])
-                    .filter { extensions.contains($0.pathExtension.lowercased()) }
-            } else if extensions.contains(url.pathExtension.lowercased()) {
-                fonts.append(url)
-            }
-        }
-        guard !fonts.isEmpty else {
-            banner = "No .otf, .ttf or .ttc files were selected."
-            return
-        }
+    func importFonts() {
+        guard let output = outputExecutable else { return }
+        let destination = SharedFonts.localFolder(besides: output)
+        guard let fonts = chooseFonts() else { return }
         do {
-            try manager.createDirectory(at: destination, withIntermediateDirectories: true)
-            for font in fonts {
-                let target = destination.appendingPathComponent(font.lastPathComponent)
-                if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
-                try manager.copyItem(at: font, to: target)
-            }
+            try SharedFonts.detachShared(besides: output)
+            try SharedFonts.copy(fonts, to: destination)
             runner.note("Imported \(fonts.count) fonts into \(destination.path)")
         } catch {
             banner = "Importing fonts failed: \(error.localizedDescription)"
         }
         refreshLayout()
+    }
+
+    func importSharedFonts() {
+        guard let fonts = chooseFonts() else { return }
+        do {
+            try SharedFonts.copy(fonts, to: SharedFonts.defaultFolder)
+            banner = "Imported \(fonts.count) fonts into the shared fonts folder. Titles without their own \(SharedFonts.folderName)/ link to it when launched."
+        } catch {
+            banner = "Importing fonts failed: \(error.localizedDescription)"
+        }
+        sharedFontCount = SharedFonts.fonts(in: SharedFonts.defaultFolder).count
+        refreshLayout()
+    }
+
+    func revealSharedFonts() {
+        try? FileManager.default.createDirectory(at: SharedFonts.defaultFolder, withIntermediateDirectories: true)
+        NSWorkspace.shared.open(SharedFonts.defaultFolder)
+    }
+
+    private func linkSharedFonts(besides executable: URL) {
+        guard launchEnvironment(for: executable)["ANYPS5_SYSTEM_FONTS"] == nil else { return }
+        do {
+            if try SharedFonts.link(besides: executable) {
+                runner.note("Linked \(SharedFonts.folderName)/ to the shared fonts folder.")
+            }
+        } catch {
+            runner.note("Could not link the shared fonts: \(error.localizedDescription)")
+        }
     }
 
     func createLauncher(title: String, titleId: String?, executable: URL, iconURL: URL?) {
@@ -732,6 +748,7 @@ final class AppModel {
             return
         }
         let profile = library.entry(for: executable)?.launchProfile ?? LaunchProfile()
+        linkSharedFonts(besides: executable)
         do {
             let app = try LauncherBuilder.build(title: title, titleId: titleId, executable: executable,
                                                 wine: wine.executable, environment: launchEnvironment(for: executable),
@@ -1032,8 +1049,10 @@ final class AppModel {
         var isDirectory: ObjCBool = false
         let appExists = manager.fileExists(atPath: appDirectory.path, isDirectory: &isDirectory) && isDirectory.boolValue
         let appEntries = appExists ? ((try? manager.contentsOfDirectory(atPath: appDirectory.path))?.count ?? 0) : 0
-        let fontsDirectory = ProcessInfo.processInfo.environment["ANYPS5_SYSTEM_FONTS"]
-            .map { URL(fileURLWithPath: $0) } ?? base.appendingPathComponent("anyps5-fonts")
+        let configuredFonts = ProcessInfo.processInfo.environment["ANYPS5_SYSTEM_FONTS"].map { URL(fileURLWithPath: $0) }
+        let fontSource = SharedFonts.source(besides: output)
+        let ownFonts = configuredFonts.map { !SharedFonts.fonts(in: $0).isEmpty } ?? (fontSource != .none && !SharedFonts.isShared(besides: output))
+        let sharedFonts = configuredFonts == nil && !ownFonts && sharedFontCount > 0
 
         layout = RuntimeLayout(
             executableExists: manager.fileExists(atPath: output.path),
@@ -1041,7 +1060,8 @@ final class AppModel {
             libraryCount: libraryCount,
             appDirectoryExists: appExists,
             appEntryCount: appEntries,
-            fontsPresent: manager.fileExists(atPath: fontsDirectory.path)
+            fontsPresent: ownFonts || sharedFonts,
+            fontsShared: sharedFonts
         )
     }
 

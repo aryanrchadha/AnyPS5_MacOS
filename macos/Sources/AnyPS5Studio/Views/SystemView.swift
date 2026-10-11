@@ -361,6 +361,18 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Section("Shared fonts") {
+                HStack {
+                    Text(model.sharedFontCount == 1 ? "1 font file" : "\(model.sharedFontCount) font files")
+                    Spacer()
+                    Button("Import…") { model.importSharedFonts() }
+                    Button("Reveal") { model.revealSharedFonts() }
+                }
+                Text("Console fonts or Noto substitutes kept in \(SharedFonts.defaultFolder.path). A title without its own \(SharedFonts.folderName)/ folder gets a link to this folder when it is launched or added to Applications.")
+                    .font(.captionText)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Section("Conversion") {
                 LabeledContent("Switches") {
                     Button("Reset to Defaults") { model.resetSettings() }

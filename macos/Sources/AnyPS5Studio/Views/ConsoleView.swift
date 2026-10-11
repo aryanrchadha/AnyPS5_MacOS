@@ -189,7 +189,9 @@ private struct LayoutCard: View {
                         Hairline()
                         CheckRow(title: "Game files", detail: "\(layout.appEntryCount) entries in app0/", ok: layout.appDirectoryExists && layout.appEntryCount > 1)
                         Hairline()
-                        CheckRow(title: "System fonts", detail: layout.fontsPresent ? "anyps5-fonts/" : "Optional", ok: layout.fontsPresent, optional: true)
+                        CheckRow(title: "System fonts",
+                                 detail: layout.fontsShared ? "Shared, linked at launch" : layout.fontsPresent ? "anyps5-fonts/" : "Optional",
+                                 ok: layout.fontsPresent, optional: true)
                     }
 
                     FlowButtons()

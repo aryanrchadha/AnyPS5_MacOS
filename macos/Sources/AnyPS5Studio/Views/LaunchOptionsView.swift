@@ -220,6 +220,14 @@ struct SessionSummary: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
+                        ForEach(crash.advice, id: \.self) { advice in
+                            Label(advice, systemImage: "arrow.turn.down.right")
+                                .font(.captionText)
+                                .foregroundStyle(Theme.textSecondary)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                        }
                     }
                     .padding(.top, 2)
                 }

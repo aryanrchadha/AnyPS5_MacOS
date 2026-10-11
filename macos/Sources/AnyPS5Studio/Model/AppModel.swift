@@ -406,6 +406,9 @@ final class AppModel {
                 for finding in crash.findings {
                     self.runner.note("Likely cause: \(finding.headline)" + (finding.detail.map { " \u{2014} \($0)" } ?? ""))
                 }
+                for advice in crash.advice {
+                    self.runner.note("Next step: \(advice)")
+                }
                 SystemNotifier.post(title: "\(title) exited with code \(code)",
                                     body: crash.headline ?? "The session log has the full output.")
             }

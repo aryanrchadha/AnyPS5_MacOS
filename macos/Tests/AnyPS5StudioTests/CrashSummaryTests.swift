@@ -86,4 +86,44 @@ final class CrashSummaryTests: XCTestCase {
                                         mac: "M", macOS: "m", runtime: nil, appVersion: "1", crash: crash, home: "/Users/pat").markdown
         XCTAssertFalse(clean.contains("Likely cause"))
     }
+
+    func testAdviceForEachKind() {
+        let summary = CrashSummary(lines: [
+            "! [coredump] uncaught C++ exception 0x1 of type std::runtime_error, what(): sceFontOpen not implemented",
+            "! FATAL: unhandled exception 0xc000001d on thread 1 'Main'",
+            "! FATAL: unhandled exception 0xc0000005 on thread 2 'Render'",
+            "! err:module:import_dll Library VCRUNTIME140_1.dll (which is needed by L\"Z:\\\\Game\\\\eboot.exe\") not found",
+            "! err:module:import_dll Library d3dcompiler_47.dll (which is needed by L\"Z:\\\\Game\\\\eboot.exe\") not found",
+        ])
+        XCTAssertEqual(summary.findings.map(\.subject), ["sceFontOpen", "C000001D", "C0000005", "VCRUNTIME140_1.dll", "d3dcompiler_47.dll"])
+        let advice = summary.findings.map(\.advice)
+        XCTAssertTrue(advice[0].contains("implement sceFontOpen"))
+        XCTAssertTrue(advice[1].hasPrefix("Rosetta 2 could not run an instruction"))
+        XCTAssertEqual(advice[2], CrashAdvice.rerun)
+        XCTAssertTrue(advice[3].contains("winetricks vcrun2022"))
+        XCTAssertTrue(advice[4].contains("winetricks d3dcompiler_47"))
+        XCTAssertEqual(CrashFinding(kind: .missingLibrary, headline: "Missing library: steam_api64.dll", detail: nil,
+                                    subject: "steam_api64.dll").advice,
+                       "Copy steam_api64.dll next to the executable, or install it into the Wine prefix.")
+        XCTAssertEqual(summary.advice.count, 5)
+        XCTAssertEqual(CrashSummary(lines: ["terminate called after throwing an instance of 'A'", "terminate called after throwing an instance of 'B'"]).advice,
+                       [CrashAdvice.rerun])
+    }
+
+    func testVulkanErrorsAreGPUFindings() {
+        let summary = CrashSummary(lines: [
+            "! [coredump] uncaught C++ exception 0x1 of type std::runtime_error, what(): Vulkan: no usable device whose name contains ANYPS5_GPU=\"Radeon\"; devices: Apple M3 Max",
+            "! terminate called after throwing an instance of 'std::runtime_error'",
+            "!   what():  Vulkan: no usable device whose name contains ANYPS5_GPU=\"Radeon\"; devices: Apple M3 Max",
+        ])
+        XCTAssertEqual(summary.findings.count, 1)
+        XCTAssertEqual(summary.findings[0].kind, .gpu)
+        XCTAssertEqual(summary.findings[0].headline, "Vulkan: no usable device whose name contains ANYPS5_GPU=\"Radeon\"; devices: Apple M3 Max")
+        XCTAssertTrue(summary.findings[0].advice.contains("Remove it from Extra environment"))
+
+        let loader = CrashSummary(lines: ["[coredump] uncaught C++ exception 0x1 of type std::runtime_error, what(): Vulkan loader: no library",
+                                          "Vulkan: no Vulkan 1.1 device with graphics, compute and swapchain presentation"])
+        XCTAssertEqual(loader.findings.map(\.kind), [.gpu, .gpu])
+        XCTAssertTrue(loader.findings[0].advice.contains("MoltenVK"))
+    }
 }

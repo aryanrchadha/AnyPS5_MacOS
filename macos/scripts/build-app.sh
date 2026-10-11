@@ -83,7 +83,18 @@ if [[ "${DMG:-0}" == "1" ]]; then
     mkdir -p "$staging"
     cp -R "$APP" "$staging/"
     ln -s /Applications "$staging/Applications"
-    hdiutil create -volname "AnyPS5 Studio" -srcfolder "$staging" -ov -format UDZO "$BUILD/AnyPS5-Studio.dmg" >/dev/null
+    for attempt in 1 2 3 4 5; do
+        if hdiutil create -volname "AnyPS5 Studio" -srcfolder "$staging" -ov -format UDZO "$BUILD/AnyPS5-Studio.dmg" >/dev/null; then
+            break
+        fi
+        if [[ $attempt -eq 5 ]]; then
+            echo "hdiutil create failed $attempt times." >&2
+            exit 1
+        fi
+        echo "hdiutil create failed (attempt $attempt of 5); retrying in $((attempt * 5))s." >&2
+        rm -f "$BUILD/AnyPS5-Studio.dmg"
+        sleep $((attempt * 5))
+    done
     echo "$BUILD/AnyPS5-Studio.dmg"
 fi
 

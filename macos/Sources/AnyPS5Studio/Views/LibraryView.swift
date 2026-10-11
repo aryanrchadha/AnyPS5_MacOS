@@ -17,9 +17,11 @@ struct LibraryView: View {
     @State var search = ""
     @State var sort: LibrarySort = .recent
     @State var sizes: [String: Int64] = [:]
+    @State var statusFilter: LibraryStatusFilter = .all
 
     private var entries: [LibraryEntry] {
-        LibraryOrganizer.arrange(model.library.entries, query: search, sort: sort, favorites: model.favorites, sizes: sizes)
+        LibraryOrganizer.arrange(model.library.entries, query: search, sort: sort, favorites: model.favorites,
+                                 sizes: sizes, status: statusFilter)
     }
 
     var body: some View {
@@ -33,6 +35,13 @@ struct LibraryView: View {
                         .frame(maxWidth: 320)
                     GlassSegmented(options: LibrarySort.allCases, selection: $sort) { $0.title }
                         .frame(maxWidth: 360)
+                    Picker("Status", selection: $statusFilter) {
+                        ForEach(LibraryStatusFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 150)
                     Spacer()
                     Text("\(model.library.entries.count) titles")
                         .font(.captionText)
@@ -218,6 +227,7 @@ private struct LibraryCard: View {
                 Button("Clear") { model.library.setStatus(nil, notes: entry.notes, for: entry.output) }
                     .disabled(entry.status == nil)
             }
+            Button("Copy Compatibility Report") { model.copyCompatibilityReport(for: entry) }
             Button("Copy Launch Link") { model.copyLaunchLink(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded)
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }

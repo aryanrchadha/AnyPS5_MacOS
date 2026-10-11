@@ -488,6 +488,17 @@ final class AppModel {
         return approved
     }
 
+    func copyCompatibilityReport(for entry: LibraryEntry) {
+        let report = CompatibilityReport(entry: entry,
+                                         mac: "\(system.chip), \(system.memoryLabel)",
+                                         macOS: system.macOSLabel,
+                                         runtime: entry.target == .windows ? wineRuntime(for: entry.output)?.name : nil,
+                                         appVersion: appVersion)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(report.markdown, forType: .string)
+        runner.note("Copied the compatibility report for \(entry.title)")
+    }
+
     func copyLaunchLink(for entry: LibraryEntry) {
         guard let url = StudioLink.launchURL(for: entry) else { return }
         NSPasteboard.general.clearContents()

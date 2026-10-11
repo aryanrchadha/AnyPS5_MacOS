@@ -15,11 +15,45 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     }
 }
 
+enum LibraryStatusFilter: Hashable, Identifiable {
+    case all
+    case notSet
+    case status(PlayStatus)
+
+    static var allCases: [LibraryStatusFilter] { [.all, .notSet] + PlayStatus.allCases.map { .status($0) } }
+
+    var id: String {
+        switch self {
+        case .all: "all"
+        case .notSet: "notSet"
+        case .status(let status): status.rawValue
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .all: "All statuses"
+        case .notSet: "Status not set"
+        case .status(let status): status.title
+        }
+    }
+
+    func matches(_ entry: LibraryEntry) -> Bool {
+        switch self {
+        case .all: true
+        case .notSet: entry.status == nil
+        case .status(let status): entry.status == status
+        }
+    }
+}
+
 enum LibraryOrganizer {
     static func arrange(_ entries: [LibraryEntry], query: String, sort: LibrarySort,
-                        favorites: Set<String>, sizes: [String: Int64] = [:]) -> [LibraryEntry] {
+                        favorites: Set<String>, sizes: [String: Int64] = [:],
+                        status: LibraryStatusFilter = .all) -> [LibraryEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        let filtered = trimmed.isEmpty ? entries : entries.filter {
+        let matching = entries.filter(status.matches)
+        let filtered = trimmed.isEmpty ? matching : matching.filter {
             $0.title.localizedCaseInsensitiveContains(trimmed) || ($0.titleId ?? "").localizedCaseInsensitiveContains(trimmed)
                 || ($0.notes ?? "").localizedCaseInsensitiveContains(trimmed)
                 || ($0.status?.title ?? "").localizedCaseInsensitiveContains(trimmed)

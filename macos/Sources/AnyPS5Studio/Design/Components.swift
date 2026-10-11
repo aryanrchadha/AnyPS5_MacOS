@@ -105,7 +105,7 @@ struct Chip: View {
             if let symbol {
                 Image(systemName: symbol).font(.system(size: 10, weight: .light))
             }
-            Text(text).font(.captionText)
+            Text(text).font(.captionText).lineLimit(1)
         }
         .foregroundStyle(tint)
         .padding(.horizontal, 10)
@@ -339,6 +339,49 @@ enum GrainTexture {
         image.addRepresentation(rep)
         return image
     }()
+}
+
+struct FlowRow: Layout {
+    var spacing: CGFloat = 6
+    var lineSpacing: CGFloat = 6
+
+    private func sizes(_ subviews: Subviews, available: CGFloat) -> [CGSize] {
+        subviews.map { subview in
+            let width = min(subview.sizeThatFits(.unspecified).width, available)
+            return subview.sizeThatFits(ProposedViewSize(width: width, height: nil))
+        }
+    }
+
+    private func lines(_ sizes: [CGSize], available: CGFloat) -> [[Int]] {
+        FlowLines.lines(widths: sizes.map(\.width), available: available, spacing: spacing)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let available = proposal.width ?? .infinity
+        let sizes = sizes(subviews, available: available)
+        let lines = lines(sizes, available: available)
+        let width = lines.map { line in
+            line.map { sizes[$0].width }.reduce(0, +) + spacing * CGFloat(max(0, line.count - 1))
+        }.max() ?? 0
+        let height = lines.map { line in line.map { sizes[$0].height }.max() ?? 0 }.reduce(0, +)
+            + lineSpacing * CGFloat(max(0, lines.count - 1))
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let sizes = sizes(subviews, available: bounds.width)
+        var y = bounds.minY
+        for line in lines(sizes, available: bounds.width) {
+            var x = bounds.minX
+            let height = line.map { sizes[$0].height }.max() ?? 0
+            for index in line {
+                subviews[index].place(at: CGPoint(x: x, y: y + (height - sizes[index].height) / 2),
+                                      proposal: ProposedViewSize(sizes[index]))
+                x += sizes[index].width + spacing
+            }
+            y += height + lineSpacing
+        }
+    }
 }
 
 struct WeightedRow: Layout {

@@ -45,6 +45,8 @@ final class AppModel {
     static let defaultWineEnvironment = "WINEDEBUG=-all\nWINEMSYNC=1\nWINEESYNC=1"
 
     var route: Route = .convert
+    var librarySearch = ""
+    var libraryStatus: LibraryStatusFilter = .all
     var settings: ConversionSettings {
         didSet { persistSettings() }
     }
@@ -480,6 +482,15 @@ final class AppModel {
         switch link {
         case .page(let name):
             route = Route(rawValue: name) ?? .library
+        case .library(let target):
+            route = .library
+            libraryStatus = .all
+            if let entry = StudioLink.match(target, in: library.entries) {
+                librarySearch = entry.titleId ?? entry.title
+            } else {
+                librarySearch = target
+                banner = "No converted title matches \u{201C}\(target)\u{201D}."
+            }
         case .launch(let target):
             guard let entry = StudioLink.match(target, in: library.entries) else {
                 route = .library
@@ -562,7 +573,15 @@ final class AppModel {
     }
 
     func copyLaunchLink(for entry: LibraryEntry) {
-        guard let url = StudioLink.launchURL(for: entry) else { return }
+        copyLink(StudioLink.launchURL(for: entry))
+    }
+
+    func copyLibraryLink(for entry: LibraryEntry) {
+        copyLink(StudioLink.libraryURL(for: entry))
+    }
+
+    private func copyLink(_ url: URL?) {
+        guard let url else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(url.absoluteString, forType: .string)
         runner.note("Copied \(url.absoluteString)")

@@ -14,28 +14,27 @@ private func measureSizes(_ entries: [LibraryEntry]) async -> [String: Int64] {
 
 struct LibraryView: View {
     @Environment(AppModel.self) private var model
-    @State var search = ""
     @State var sort: LibrarySort = .recent
     @State var sizes: [String: Int64] = [:]
-    @State var statusFilter: LibraryStatusFilter = .all
 
     private var entries: [LibraryEntry] {
-        LibraryOrganizer.arrange(model.library.entries, query: search, sort: sort, favorites: model.favorites,
-                                 sizes: sizes, status: statusFilter)
+        LibraryOrganizer.arrange(model.library.entries, query: model.librarySearch, sort: sort, favorites: model.favorites,
+                                 sizes: sizes, status: model.libraryStatus)
     }
 
     var body: some View {
+        @Bindable var model = model
         Page(eyebrow: "Library",
              title: "Converted titles",
              subtitle: "Every conversion is remembered here with its output, target and result. Reopen a title to convert it again with different switches.") {
             VStack(alignment: .leading, spacing: 20) {
                 BannerRow()
                 HStack(spacing: 12) {
-                    GlassField(placeholder: "Search by title or title ID", text: $search)
+                    GlassField(placeholder: "Search by title or title ID", text: $model.librarySearch)
                         .frame(maxWidth: 320)
                     GlassSegmented(options: LibrarySort.allCases, selection: $sort) { $0.title }
                         .frame(maxWidth: 360)
-                    Picker("Status", selection: $statusFilter) {
+                    Picker("Status", selection: $model.libraryStatus) {
                         ForEach(LibraryStatusFilter.allCases) { filter in
                             Text(filter.title).tag(filter)
                         }
@@ -86,7 +85,8 @@ struct LibraryView: View {
                     }
                     .reveal(0.08)
                 } else {
-                    if model.library.entries.contains(where: { !($0.sessions ?? []).isEmpty }) {
+                    if model.librarySearch.trimmingCharacters(in: .whitespaces).isEmpty,
+                       model.library.entries.contains(where: { !($0.sessions ?? []).isEmpty }) {
                         ActivityCard(activity: PlayActivity(entries: model.library.entries))
                             .reveal(0.06)
                     }
@@ -137,7 +137,7 @@ private struct LibraryCard: View {
                         Text(entry.titleId ?? entry.source.deletingLastPathComponent().lastPathComponent)
                             .font(.monoSmall)
                             .foregroundStyle(Theme.textTertiary)
-                        HStack(spacing: 6) {
+                        FlowRow {
                             Chip(text: entry.succeeded ? "Converted" : "Exit \(entry.exitCode)",
                                  symbol: entry.succeeded ? "checkmark" : "xmark",
                                  tint: entry.succeeded ? Theme.success : Theme.failure)
@@ -230,6 +230,7 @@ private struct LibraryCard: View {
             Button("Copy Compatibility Report") { model.copyCompatibilityReport(for: entry) }
             Button("Copy Launch Link") { model.copyLaunchLink(for: entry) }
                 .disabled(entry.target != .windows || !entry.succeeded)
+            Button("Copy Library Link") { model.copyLibraryLink(for: entry) }
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
             Button("Open Last Session Log") { model.openLastSessionLog(for: entry) }
                 .disabled(entry.lastSession == nil)
@@ -323,6 +324,13 @@ struct ActivityCard: View {
                     }
                 }
                 .frame(height: 130)
+                .overlay {
+                    if activity.sessions == 0 {
+                        Text("No sessions in the last 7 days")
+                            .font(.captionText)
+                            .foregroundStyle(Theme.textTertiary)
+                    }
+                }
                 .accessibilityLabel("Play time per day for the last 7 days")
             }
         }

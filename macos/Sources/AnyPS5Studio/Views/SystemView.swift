@@ -208,7 +208,7 @@ private struct DisplayCard: View {
                 CardHeader(eyebrow: "Display and GPU", title: "4K at 120 Hz readiness",
                            trailing: AnyView(GhostButton(title: "Refresh", symbol: "arrow.clockwise") { refresh() }))
                 if let gpu {
-                    HStack(spacing: 8) {
+                    FlowRow(spacing: 8) {
                         Chip(text: gpu.name, symbol: "cpu")
                         Chip(text: "\(ByteCountFormatter.string(fromByteCount: Int64(gpu.recommendedWorkingSetBytes), countStyle: .memory)) GPU working set",
                              symbol: "memorychip")

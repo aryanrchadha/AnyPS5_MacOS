@@ -456,7 +456,12 @@ final class AppModel {
         return LaunchPreflight(output: output, runtime: runtime?.executable, runtimeName: runtime?.name,
                                pinnedRuntime: library.entry(for: output)?.launchProfile.wineRuntimePath,
                                needsRosetta: system.isAppleSilicon && !system.rosettaInstalled,
-                               freeBytes: LaunchPreflight.freeBytes(near: output))
+                               freeBytes: LaunchPreflight.freeBytes(near: output), displays: DisplayProbe.displays())
+    }
+
+    func openDisplaySettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.Displays-Settings.extension") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func wineRuntime(for output: URL) -> WineRuntime? {

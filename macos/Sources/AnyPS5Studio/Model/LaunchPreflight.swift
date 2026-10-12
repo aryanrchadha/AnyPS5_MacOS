@@ -38,7 +38,7 @@ struct LaunchPreflight: Equatable {
     }
 
     init(output: URL, runtime: URL?, runtimeName: String?, pinnedRuntime: String?, needsRosetta: Bool,
-         freeBytes: Int64?, fileManager: FileManager = .default) {
+         freeBytes: Int64?, displays: [DisplayTarget] = [], fileManager: FileManager = .default) {
         var checks: [PreflightCheck] = []
         var isDirectory: ObjCBool = false
         let exists = fileManager.fileExists(atPath: output.path, isDirectory: &isDirectory) && !isDirectory.boolValue
@@ -85,6 +85,11 @@ struct LaunchPreflight: Equatable {
                 id: "disk", title: "Free space",
                 level: low ? .warning : .ok,
                 detail: low ? "Only \(free) free. Saves and the shader cache may fail to write." : "\(free) free"))
+        }
+        let advice = displays.compactMap(\.refreshAdvice)
+        if !advice.isEmpty {
+            checks.append(PreflightCheck(id: "display", title: "Display refresh rate", level: .warning,
+                                         detail: advice.joined(separator: " ")))
         }
         self.checks = checks
     }

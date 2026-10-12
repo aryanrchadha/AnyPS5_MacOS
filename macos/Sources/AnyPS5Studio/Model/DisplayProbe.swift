@@ -12,12 +12,15 @@ enum DisplayProbe {
     static func displays() -> [DisplayTarget] {
         NSScreen.screens.map { screen in
             let scale = screen.backingScaleFactor
-            let mode = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)
-                .flatMap { CGDisplayCopyDisplayMode(CGDirectDisplayID($0.uint32Value)) }
+            let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)
+                .map { CGDirectDisplayID($0.uint32Value) }
+            let mode = id.flatMap { CGDisplayCopyDisplayMode($0) }
+            let modes = id.flatMap { CGDisplayCopyAllDisplayModes($0, nil) as? [CGDisplayMode] } ?? []
+            let best = modes.map { Int($0.refreshRate.rounded()) }.max()
             let width = mode.map { Int($0.pixelWidth) } ?? Int(screen.frame.width * scale)
             let height = mode.map { Int($0.pixelHeight) } ?? Int(screen.frame.height * scale)
             return DisplayTarget(name: screen.localizedName, pixelWidth: width, pixelHeight: height,
-                                 maximumRefreshRate: screen.maximumFramesPerSecond)
+                                 maximumRefreshRate: screen.maximumFramesPerSecond, bestRefreshRate: best)
         }
     }
 

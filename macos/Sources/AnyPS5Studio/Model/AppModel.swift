@@ -186,6 +186,36 @@ final class AppModel {
         }
     }
 
+    func winePrefixSize(for output: URL) -> (files: Int, bytes: Int64)? {
+        guard WinePrefix.exists(besides: output) else { return nil }
+        return ShaderCache.size(at: WinePrefix.folder(besides: output))
+    }
+
+    func revealWinePrefix(for output: URL) {
+        reveal(WinePrefix.folder(besides: output))
+    }
+
+    func resetWinePrefix(for output: URL) {
+        let folder = WinePrefix.folder(besides: output)
+        guard WinePrefix.exists(besides: output) else { return }
+        guard !runner.state.isRunning else {
+            banner = "Stop the running task before resetting the Wine prefix."
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Reset the Wine prefix?"
+        alert.informativeText = "This moves \(folder.path) to the Trash, including DLLs and runtimes installed into it with winetricks. Wine creates a fresh prefix on the next launch. Saves in \(SaveData.folderName) are not affected."
+        alert.addButton(withTitle: "Move to Trash")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try FileManager.default.trashItem(at: folder, resultingItemURL: nil)
+            runner.note("Moved the Wine prefix \(folder.path) to the Trash.")
+        } catch {
+            banner = "Resetting the Wine prefix failed: \(error.localizedDescription)"
+        }
+    }
+
     func refreshEnvironment() {
         system = SystemProbe.report()
         relinker = RelinkerLocator.locate()

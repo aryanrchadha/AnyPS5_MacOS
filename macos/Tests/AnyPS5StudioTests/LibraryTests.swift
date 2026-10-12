@@ -52,6 +52,25 @@ final class LibraryStoreTests: XCTestCase {
 }
 
 final class LibraryOrganizerTests: XCTestCase {
+    func testFrameRateFilters() {
+        let uhd = FrameRateMeter.Size(width: 3840, height: 2160)
+        let fast = makeEntry("Fast", sessions: [PlaySession(start: Date(timeIntervalSince1970: 0), duration: 60, exitCode: 0,
+                                                            averageFPS: 119, lowestFPS: 100, frameSize: uhd)])
+        let slow = makeEntry("Slow", sessions: [PlaySession(start: Date(timeIntervalSince1970: 0), duration: 60, exitCode: 0,
+                                                            averageFPS: 58, lowestFPS: 40, frameSize: uhd)])
+        let lowRes = makeEntry("Low", sessions: [PlaySession(start: Date(timeIntervalSince1970: 0), duration: 60, exitCode: 0,
+                                                             averageFPS: 120, lowestFPS: 110, frameSize: FrameRateMeter.Size(width: 2560, height: 1440))])
+        let unmeasured = makeEntry("None", sessions: [PlaySession(start: Date(timeIntervalSince1970: 0), duration: 60, exitCode: 0)])
+        let entries = [fast, slow, lowRes, unmeasured, makeEntry("New")]
+        func titles(_ filter: LibraryStatusFilter) -> [String] {
+            LibraryOrganizer.arrange(entries, query: "", sort: .title, favorites: [], status: filter).map(\.title)
+        }
+        XCTAssertEqual(titles(.measured), ["Fast", "Low", "Slow"])
+        XCTAssertEqual(titles(.meetsTarget), ["Fast"])
+        XCTAssertEqual(Set(LibraryStatusFilter.allCases.map(\.id)).count, LibraryStatusFilter.allCases.count)
+        XCTAssertEqual(LibraryStatusFilter.allCases.suffix(2).map(\.title), ["Frame rate measured", "Meets 4K 120"])
+    }
+
     func testCountText() {
         XCTAssertEqual(LibraryOrganizer.countText(shown: 5, total: 5), "5 titles")
         XCTAssertEqual(LibraryOrganizer.countText(shown: 1, total: 5), "1 of 5 titles")

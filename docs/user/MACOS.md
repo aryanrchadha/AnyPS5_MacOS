@@ -18,7 +18,7 @@ Running Windows output through Wine on Apple Silicon has not been verified by th
 
 ## Performance
 
-The System page reports each display's current resolution and maximum refresh rate, and the GPU's name and recommended working set, against a 4K, 120 Hz target. When a display runs below 120 Hz but lists a faster mode, the page says so and *Open Displays* opens System Settings › Displays to change the refresh rate; a built-in ProMotion display set to a fixed 60 Hz may not list its faster mode and is then not flagged. Meeting the target is necessary but not sufficient:
+The System page's checks include *Performance*, which turns yellow while Low Power Mode is on or macOS reports the Mac as seriously or critically hot. It also reports each display's current resolution and maximum refresh rate, and the GPU's name and recommended working set, against a 4K, 120 Hz target. When a display runs below 120 Hz but lists a faster mode, the page says so and *Open Displays* opens System Settings › Displays to change the refresh rate; a built-in ProMotion display set to a fixed 60 Hz may not list its faster mode and is then not flagged. Meeting the target is necessary but not sufficient:
 
 - The runtime presents with vsync (`VK_PRESENT_MODE_FIFO_KHR`), so the frame rate never exceeds the display's refresh rate or the rate at which the title submits frames. Most titles pace themselves at 30 or 60 FPS, and the runtime does not unlock that.
 - On Apple Silicon, titles run through Rosetta 2, Wine and MoltenVK on top of the runtime's shader recompilation; each layer costs CPU and GPU time.

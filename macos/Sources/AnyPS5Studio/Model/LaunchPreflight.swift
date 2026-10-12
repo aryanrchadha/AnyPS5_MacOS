@@ -34,6 +34,15 @@ enum PowerState: Equatable {
     }
 }
 
+extension PowerState {
+    static let fullPerformance = "Low Power Mode is off and macOS reports no thermal throttling."
+
+    static func summary(_ states: [PowerState]) -> String {
+        let details = states.compactMap(\.detail)
+        return details.isEmpty ? fullPerformance : details.joined(separator: " ")
+    }
+}
+
 struct LaunchPreflight: Equatable {
     static let minimumFreeBytes: Int64 = 2 * 1024 * 1024 * 1024
 

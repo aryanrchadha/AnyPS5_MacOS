@@ -60,6 +60,11 @@ private struct ReadinessCard: View {
                                      : "Rosetta translates AVX2 from macOS 15. PS5 code uses it widely.",
                                  state: system.rosettaHasAVX2 || !system.isAppleSilicon ? .ok : .warning)
                     Hairline()
+                    let power = PowerState.current()
+                    ReadinessRow(title: "Performance",
+                                 detail: PowerState.summary(power),
+                                 state: power.compactMap(\.detail).isEmpty ? .ok : .warning)
+                    Hairline()
                     ReadinessRow(title: "Wine runtime",
                                  detail: system.wineRuntimes.isEmpty
                                      ? "None found. CrossOver, Whisky or Homebrew Wine are detected automatically."

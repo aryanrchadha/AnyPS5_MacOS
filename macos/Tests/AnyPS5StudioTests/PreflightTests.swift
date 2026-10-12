@@ -114,4 +114,11 @@ final class LaunchPreflightTests: XCTestCase {
         XCTAssertTrue(both.warnings[0].detail.contains("throttling the CPU and GPU"))
         XCTAssertTrue(check([.hot(critical: true)]).warnings[0].detail.contains("critically hot"))
     }
+
+    func testPowerSummary() {
+        XCTAssertEqual(PowerState.summary([]), PowerState.fullPerformance)
+        XCTAssertEqual(PowerState.summary([.normal]), PowerState.fullPerformance)
+        XCTAssertTrue(PowerState.summary([.lowPower]).hasPrefix("Low Power Mode is on"))
+        XCTAssertTrue(PowerState.summary([.lowPower, .hot(critical: true)]).contains("critically hot"))
+    }
 }

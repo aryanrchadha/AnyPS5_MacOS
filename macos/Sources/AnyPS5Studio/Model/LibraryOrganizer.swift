@@ -1,7 +1,7 @@
 import Foundation
 
 enum LibrarySort: String, CaseIterable, Identifiable {
-    case recent, title, playTime, size
+    case recent, title, playTime, size, frameRate
 
     var id: String { rawValue }
 
@@ -11,6 +11,7 @@ enum LibrarySort: String, CaseIterable, Identifiable {
         case .title: "Title"
         case .playTime: "Play time"
         case .size: "Size"
+        case .frameRate: "FPS"
         }
     }
 }
@@ -84,6 +85,13 @@ enum LibraryOrganizer {
             sorted = filtered.sorted { $0.playTime > $1.playTime }
         case .size:
             sorted = filtered.sorted { (sizes[key($0)] ?? 0) > (sizes[key($1)] ?? 0) }
+        case .frameRate:
+            sorted = filtered.sorted { lhs, rhs in
+                let left = lhs.lastMeasuredSession?.averageFPS ?? -1
+                let right = rhs.lastMeasuredSession?.averageFPS ?? -1
+                if left != right { return left > right }
+                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            }
         }
         let pinned = sorted.filter { favorites.contains(key($0)) }
         let rest = sorted.filter { !favorites.contains(key($0)) }

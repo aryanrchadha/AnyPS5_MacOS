@@ -148,7 +148,17 @@ final class AppModel {
     }
 
     func launchEnvironment(for output: URL) -> [String: String] {
-        (library.entry(for: output)?.launchProfile ?? LaunchProfile()).merged(over: parsedWineEnvironment)
+        let profile = library.entry(for: output)?.launchProfile ?? LaunchProfile()
+        return profile.merged(over: WinePrefix.apply(to: parsedWineEnvironment, separate: profile.separatePrefix, executable: output))
+    }
+
+    func winetricksCommand(for entry: LibraryEntry, verb: String) -> String {
+        WinePrefix.winetricksCommand(verb: verb, environment: launchEnvironment(for: entry.output),
+                                     wine: wineRuntime(for: entry.output)?.executable)
+    }
+
+    func copyWinetricksCommand(for entry: LibraryEntry, verb: String) {
+        copyText(winetricksCommand(for: entry, verb: verb))
     }
 
     func setProfile(_ profile: LaunchProfile, for output: URL) {
@@ -409,6 +419,9 @@ final class AppModel {
                 for advice in crash.advice {
                     self.runner.note("Next step: \(advice)")
                 }
+                for verb in Set(crash.findings.compactMap(\.winetricksVerb)).sorted() {
+                    self.runner.note("Command: " + WinePrefix.winetricksCommand(verb: verb, environment: environment, wine: wine.executable))
+                }
                 SystemNotifier.post(title: "\(title) exited with code \(code)",
                                     body: crash.headline ?? "The session log has the full output.")
             }
@@ -585,9 +598,13 @@ final class AppModel {
 
     private func copyLink(_ url: URL?) {
         guard let url else { return }
+        copyText(url.absoluteString)
+    }
+
+    private func copyText(_ text: String) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(url.absoluteString, forType: .string)
-        runner.note("Copied \(url.absoluteString)")
+        NSPasteboard.general.setString(text, forType: .string)
+        runner.note("Copied \(text)")
     }
 
     func launchLastPlayed() {

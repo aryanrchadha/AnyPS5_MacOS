@@ -43,6 +43,11 @@ struct LaunchOptionsPanel: View {
                           flag: "WINEDEBUG=-all",
                           isOn: $profile.quietWine)
                 Hairline()
+                OptionRow(title: "Separate Wine prefix",
+                          detail: "Give this title its own Wine prefix in \(WinePrefix.folderName) beside the executable, so DLLs installed for it with winetricks do not change other titles. The first launch takes longer while Wine creates it.",
+                          flag: "WINEPREFIX=\u{2026}/\(WinePrefix.folderName)",
+                          isOn: $profile.separatePrefix)
+                Hairline()
                 OptionRow(title: "Back up saves on launch",
                           detail: "Archive the save folder to the Save backups folder in Settings before each launch. The newest \(SaveData.automaticRetention) automatic backups are kept.",
                           flag: "\(SaveData.folderName) → \(SaveData.backupRoot.lastPathComponent)",
@@ -230,6 +235,15 @@ struct SessionSummary: View {
                         }
                     }
                     .padding(.top, 2)
+                }
+                if let crash {
+                    ForEach(Array(Set(crash.findings.compactMap(\.winetricksVerb))).sorted(), id: \.self) { verb in
+                        Button("Copy winetricks \(verb) command") { model.copyWinetricksCommand(for: entry, verb: verb) }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Theme.accent)
+                            .help(model.winetricksCommand(for: entry, verb: verb))
+                    }
                 }
                 Button("Launch again with Wine errors") { model.launch(entry, diagnostic: true) }
                     .buttonStyle(.plain)

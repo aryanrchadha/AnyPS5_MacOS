@@ -67,4 +67,17 @@ final class FrameRateMeterTests: XCTestCase {
         XCTAssertFalse(CompatibilityReport(entry: makeEntry("Game", sessions: [PlaySession(start: Date(), duration: 1, exitCode: 0)]),
                                            mac: "M", macOS: "m", runtime: nil, appVersion: "1").markdown.contains("Frame rate"))
     }
+
+    func testChipTextAndLastMeasuredSession() {
+        XCTAssertEqual(FrameRateMeter.chipText(average: 119.7, size: FrameRateMeter.Size(width: 3840, height: 2160)), "120 fps \u{B7} 4K")
+        XCTAssertEqual(FrameRateMeter.chipText(average: 59.6, size: FrameRateMeter.Size(width: 2560, height: 1440)), "60 fps \u{B7} 1440p")
+        XCTAssertEqual(FrameRateMeter.chipText(average: 30, size: nil), "30 fps")
+        let entry = makeEntry("Game", sessions: [
+            PlaySession(start: Date(timeIntervalSince1970: 0), duration: 60, exitCode: 0, averageFPS: 45, lowestFPS: 30),
+            PlaySession(start: Date(timeIntervalSince1970: 100), duration: 60, exitCode: 0, averageFPS: 58, lowestFPS: 50),
+            PlaySession(start: Date(timeIntervalSince1970: 200), duration: 60, exitCode: 0),
+        ])
+        XCTAssertEqual(entry.lastMeasuredSession?.averageFPS, 58)
+        XCTAssertNil(makeEntry("New").lastMeasuredSession)
+    }
 }

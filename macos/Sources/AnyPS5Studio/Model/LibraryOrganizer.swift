@@ -19,14 +19,18 @@ enum LibraryStatusFilter: Hashable, Identifiable {
     case all
     case notSet
     case status(PlayStatus)
+    case measured
+    case meetsTarget
 
-    static var allCases: [LibraryStatusFilter] { [.all, .notSet] + PlayStatus.allCases.map { .status($0) } }
+    static var allCases: [LibraryStatusFilter] { [.all, .notSet] + PlayStatus.allCases.map { .status($0) } + [.measured, .meetsTarget] }
 
     var id: String {
         switch self {
         case .all: "all"
         case .notSet: "notSet"
         case .status(let status): status.rawValue
+        case .measured: "measured"
+        case .meetsTarget: "meetsTarget"
         }
     }
 
@@ -35,6 +39,8 @@ enum LibraryStatusFilter: Hashable, Identifiable {
         case .all: "All statuses"
         case .notSet: "Status not set"
         case .status(let status): status.title
+        case .measured: "Frame rate measured"
+        case .meetsTarget: "Meets 4K 120"
         }
     }
 
@@ -43,6 +49,11 @@ enum LibraryStatusFilter: Hashable, Identifiable {
         case .all: true
         case .notSet: entry.status == nil
         case .status(let status): entry.status == status
+        case .measured: entry.lastMeasuredSession != nil
+        case .meetsTarget:
+            entry.lastMeasuredSession.map { session in
+                session.averageFPS.map { FrameRateMeter.meetsTarget(average: $0, size: session.frameSize) } ?? false
+            } ?? false
         }
     }
 }

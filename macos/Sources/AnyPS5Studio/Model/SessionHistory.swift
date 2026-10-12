@@ -24,4 +24,20 @@ enum SessionHistory {
                               meetsTarget: session.averageFPS.map { FrameRateMeter.meetsTarget(average: $0, size: session.frameSize) } ?? false)
         }
     }
+
+    static let csvHeader = "start,duration_seconds,exit_code,average_fps,lowest_fps,width,height"
+
+    static func csv(for entry: LibraryEntry) -> String {
+        let iso = ISO8601DateFormatter()
+        let rows = (entry.sessions ?? []).map { session in
+            [iso.string(from: session.start),
+             String(Int(session.duration.rounded())),
+             String(session.exitCode),
+             session.averageFPS.map { String(format: "%.1f", $0) } ?? "",
+             session.lowestFPS.map { String(format: "%.1f", $0) } ?? "",
+             session.frameSize.map { String($0.width) } ?? "",
+             session.frameSize.map { String($0.height) } ?? ""].joined(separator: ",")
+        }
+        return ([csvHeader] + rows).joined(separator: "\n") + "\n"
+    }
 }

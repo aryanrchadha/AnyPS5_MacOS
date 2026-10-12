@@ -456,7 +456,8 @@ final class AppModel {
         return LaunchPreflight(output: output, runtime: runtime?.executable, runtimeName: runtime?.name,
                                pinnedRuntime: library.entry(for: output)?.launchProfile.wineRuntimePath,
                                needsRosetta: system.isAppleSilicon && !system.rosettaInstalled,
-                               freeBytes: LaunchPreflight.freeBytes(near: output), displays: DisplayProbe.displays())
+                               freeBytes: LaunchPreflight.freeBytes(near: output), displays: DisplayProbe.displays(),
+                               power: PowerState.current())
     }
 
     func openDisplaySettings() {

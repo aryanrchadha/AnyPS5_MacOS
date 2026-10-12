@@ -64,7 +64,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - *Link game files* symlinks the game's resources into `app0/` without copying. Module folders are skipped, because the relinker writes converted modules there.
 6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,).
 
-   Every launch from Studio, the menu bar or a link is checked first. A missing executable, a missing or non-executable Wine runtime, Rosetta 2 not installed on Apple Silicon, or a read-only output folder stops the launch and the banner says why. A pinned runtime that is no longer installed, less than 2 GB free on the output volume, or a display set below 120 Hz that offers a 120 Hz or faster mode, is noted in the Console and the launch goes ahead. The Options panel shows the same checks at the top.
+   Every launch from Studio, the menu bar or a link is checked first. A missing executable, a missing or non-executable Wine runtime, Rosetta 2 not installed on Apple Silicon, or a read-only output folder stops the launch and the banner says why. A pinned runtime that is no longer installed, less than 2 GB free on the output volume, a display set below 120 Hz that offers a 120 Hz or faster mode, Low Power Mode, or a Mac that macOS reports as seriously or critically hot (and therefore throttled), is noted in the Console and the launch goes ahead. The Options panel shows the same checks at the top.
 
 7. **Controls.** Edits [`anyps5-input.ini`](INPUT_MAPPING.md) beside a converted title.
    - Every action shows its current keyboard and mouse bindings, with the built-in defaults until changed.

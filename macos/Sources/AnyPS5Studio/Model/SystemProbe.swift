@@ -111,3 +111,16 @@ enum RelinkerLocator {
         return candidates.first(where: manager.isExecutableFile(atPath:)).map(URL.init(fileURLWithPath:))
     }
 }
+
+extension PowerState {
+    static func current(processInfo: ProcessInfo = .processInfo) -> [PowerState] {
+        var states: [PowerState] = []
+        if processInfo.isLowPowerModeEnabled { states.append(.lowPower) }
+        switch processInfo.thermalState {
+        case .serious: states.append(.hot(critical: false))
+        case .critical: states.append(.hot(critical: true))
+        default: break
+        }
+        return states
+    }
+}

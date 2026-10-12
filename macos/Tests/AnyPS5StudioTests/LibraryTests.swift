@@ -66,6 +66,9 @@ final class LibraryOrganizerTests: XCTestCase {
             LibraryOrganizer.arrange(entries, query: "", sort: .title, favorites: [], status: filter).map(\.title)
         }
         XCTAssertEqual(titles(.measured), ["Fast", "Low", "Slow"])
+        XCTAssertEqual(LibraryOrganizer.arrange(entries, query: "", sort: .frameRate, favorites: []).map(\.title),
+                       ["Low", "Fast", "Slow", "New", "None"])
+        XCTAssertEqual(LibrarySort.frameRate.title, "FPS")
         XCTAssertEqual(titles(.meetsTarget), ["Fast"])
         XCTAssertEqual(Set(LibraryStatusFilter.allCases.map(\.id)).count, LibraryStatusFilter.allCases.count)
         XCTAssertEqual(LibraryStatusFilter.allCases.suffix(2).map(\.title), ["Frame rate measured", "Meets 4K 120"])

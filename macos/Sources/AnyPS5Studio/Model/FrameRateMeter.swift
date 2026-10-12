@@ -63,6 +63,12 @@ struct FrameRateMeter {
         return size.map { base + " at \($0.text)" } ?? base
     }
 
+    static func chipText(average: Double, size: Size?) -> String {
+        let rate = "\(Int(average.rounded())) fps"
+        guard let size else { return rate }
+        return rate + (size.isUHD ? " \u{B7} 4K" : " \u{B7} \(min(size.width, size.height))p")
+    }
+
     static func meetsTarget(average: Double, size: Size?) -> Bool {
         (size?.isUHD ?? false) && average >= targetRate * targetTolerance
     }
@@ -72,5 +78,11 @@ struct FrameRateMeter {
               let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
               let range = Range(match.range(at: 1), in: line) else { return nil }
         return UInt64(line[range])
+    }
+}
+
+extension LibraryEntry {
+    var lastMeasuredSession: PlaySession? {
+        sessions?.last { $0.averageFPS != nil }
     }
 }

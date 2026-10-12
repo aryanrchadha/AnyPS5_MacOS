@@ -11,6 +11,7 @@ final class FixtureTests: XCTestCase {
         XCTAssertEqual(entries.map(\.titleId), ["PPSA00001", "PPSA00002", "PPSA00003", "PPSA00004", nil])
         XCTAssertEqual(entries[0].status, .playable)
         XCTAssertEqual(entries[0].sessions?.count, 2)
+        XCTAssertEqual(entries[0].lastMeasuredSession?.frameRateText, "58 fps average, 41 lowest at 3840 \u{D7} 2160")
         XCTAssertEqual(entries[1].lastSession?.exitCode, 3)
         XCTAssertEqual(entries[2].target, .linux)
         XCTAssertFalse(entries[3].succeeded)

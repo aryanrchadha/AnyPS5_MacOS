@@ -168,6 +168,12 @@ private struct LibraryCard: View {
                                 Chip(text: status.title, symbol: status.symbol, tint: status.tint)
                                     .help(status.detail)
                             }
+                            if let measured = entry.lastMeasuredSession, let average = measured.averageFPS {
+                                Chip(text: FrameRateMeter.chipText(average: average, size: measured.frameSize),
+                                     symbol: "speedometer",
+                                     tint: FrameRateMeter.meetsTarget(average: average, size: measured.frameSize) ? Theme.success : Theme.textSecondary)
+                                    .help(measured.frameRateText.map { "Last measured: \($0)" } ?? "")
+                            }
                             if model.isOutdated(entry) {
                                 Chip(text: "Older relinker", symbol: "clock.arrow.circlepath", tint: Theme.warning)
                                     .help("Converted with relinker \(entry.relinkerCommit.map { String($0.prefix(8)) } ?? "?"); this app bundles \(model.build.shortCommit ?? "?")")

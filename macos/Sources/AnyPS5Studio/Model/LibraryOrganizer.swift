@@ -147,8 +147,15 @@ struct DiagnosticsReport {
                 if let total = report.intelTotal { lines.append("AMD-only rewrites: \(total)") }
                 if let failure = report.failure { lines.append("Failure: \(failure)") }
             }
+            let profile = entry.launchProfile
+            let options = profile.optionTitles
+            lines.append("Launch profile: \(options.isEmpty ? "default" : options.joined(separator: ", "))")
+            if let runtime = profile.wineRuntimePath { lines.append("Wine runtime: \(runtime)") }
+            lines += profile.environment.sorted { $0.key < $1.key }.map { "Environment: \($0.key)=\($0.value)" }
             for session in (entry.sessions ?? []).suffix(10) {
-                lines.append("Session: \(ISO8601DateFormatter().string(from: session.start)) \(Int(session.duration))s exit \(session.exitCode)")
+                var line = "Session: \(ISO8601DateFormatter().string(from: session.start)) \(Int(session.duration))s exit \(session.exitCode)"
+                if let frameRate = session.frameRateText { line += ", \(frameRate)" }
+                lines.append(line)
             }
         }
         lines += ["", "[Console]"]

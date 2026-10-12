@@ -115,7 +115,14 @@ struct DisplayTarget: Equatable {
     var pixelWidth: Int
     var pixelHeight: Int
     var maximumRefreshRate: Int
+    var bestRefreshRate: Int? = nil
 
     var supports4K: Bool { max(pixelWidth, pixelHeight) >= 3840 && min(pixelWidth, pixelHeight) >= 2160 }
     var supports120Hz: Bool { maximumRefreshRate >= 120 }
+    var availableRefreshRate: Int { max(maximumRefreshRate, bestRefreshRate ?? 0) }
+
+    var refreshAdvice: String? {
+        guard !supports120Hz, availableRefreshRate >= 120 else { return nil }
+        return "\(name) runs at \(maximumRefreshRate) Hz but can run at \(availableRefreshRate) Hz. Choose \(availableRefreshRate) Hz under Refresh rate in System Settings \u{203A} Displays; a title's frame rate cannot exceed the display's."
+    }
 }

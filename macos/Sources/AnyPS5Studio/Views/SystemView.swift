@@ -199,6 +199,7 @@ private struct UpdatesCard: View {
 }
 
 private struct DisplayCard: View {
+    @Environment(AppModel.self) private var model
     @State var displays: [DisplayTarget] = []
     @State var gpu: GPUReport?
 
@@ -237,10 +238,18 @@ private struct DisplayCard: View {
                                  tint: display.supports120Hz ? Theme.success : Theme.warning)
                         }
                         .padding(.vertical, 10)
+                        if let advice = display.refreshAdvice {
+                            HStack(alignment: .top, spacing: 12) {
+                                Callout(text: advice)
+                                GhostButton(title: "Open Displays", symbol: "display") { model.openDisplaySettings() }
+                                    .fixedSize()
+                            }
+                            .padding(.bottom, 10)
+                        }
                         if index < displays.count - 1 { Hairline() }
                     }
                 }
-                Text("A 4K, 120 Hz display is required for 4K at 120 FPS but does not deliver it. The runtime presents with vsync, so frame rate is capped by the display and by how often the title submits frames; most titles pace themselves at 30 or 60 FPS. Rosetta 2, Wine and MoltenVK each add overhead. Turn on the Metal Performance HUD in a title's launch options to measure the real frame rate.")
+                Text("A 4K, 120 Hz display is required for 4K at 120 FPS but does not deliver it. The runtime presents with vsync, so frame rate is capped by the display and by how often the title submits frames; most titles pace themselves at 30 or 60 FPS. Rosetta 2, Wine and MoltenVK each add overhead. Turn on Measure frame rate or the Metal Performance HUD in a title's launch options to measure the real frame rate.")
                     .font(.captionText)
                     .foregroundStyle(Theme.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)

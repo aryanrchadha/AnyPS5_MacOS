@@ -18,7 +18,7 @@ Running Windows output through Wine on Apple Silicon has not been verified by th
 
 ## Performance
 
-The System page reports each display's current resolution and maximum refresh rate, and the GPU's name and recommended working set, against a 4K, 120 Hz target. Meeting it is necessary but not sufficient:
+The System page reports each display's current resolution and maximum refresh rate, and the GPU's name and recommended working set, against a 4K, 120 Hz target. When a display runs below 120 Hz but lists a faster mode, the page says so and *Open Displays* opens System Settings › Displays to change the refresh rate; a built-in ProMotion display set to a fixed 60 Hz may not list its faster mode and is then not flagged. Meeting the target is necessary but not sufficient:
 
 - The runtime presents with vsync (`VK_PRESENT_MODE_FIFO_KHR`), so the frame rate never exceeds the display's refresh rate or the rate at which the title submits frames. Most titles pace themselves at 30 or 60 FPS, and the runtime does not unlock that.
 - On Apple Silicon, titles run through Rosetta 2, Wine and MoltenVK on top of the runtime's shader recompilation; each layer costs CPU and GPU time.
@@ -64,7 +64,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - *Link game files* symlinks the game's resources into `app0/` without copying. Module folders are skipped, because the relinker writes converted modules there.
 6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,).
 
-   Every launch from Studio, the menu bar or a link is checked first. A missing executable, a missing or non-executable Wine runtime, Rosetta 2 not installed on Apple Silicon, or a read-only output folder stops the launch and the banner says why. A pinned runtime that is no longer installed, or less than 2 GB free on the output volume, is noted in the Console and the launch goes ahead. The Options panel shows the same checks at the top.
+   Every launch from Studio, the menu bar or a link is checked first. A missing executable, a missing or non-executable Wine runtime, Rosetta 2 not installed on Apple Silicon, or a read-only output folder stops the launch and the banner says why. A pinned runtime that is no longer installed, less than 2 GB free on the output volume, or a display set below 120 Hz that offers a 120 Hz or faster mode, is noted in the Console and the launch goes ahead. The Options panel shows the same checks at the top.
 
 7. **Controls.** Edits [`anyps5-input.ini`](INPUT_MAPPING.md) beside a converted title.
    - Every action shows its current keyboard and mouse bindings, with the built-in defaults until changed.

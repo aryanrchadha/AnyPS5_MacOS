@@ -75,4 +75,24 @@ final class LaunchPreflightTests: XCTestCase {
         XCTAssertNotNil(free)
         XCTAssertGreaterThan(free ?? 0, 0)
     }
+
+    func testDisplayBelowItsBestRefreshRateWarns() throws {
+        let folder = try temporaryDirectory()
+        let output = folder.appendingPathComponent("Game/Game.exe")
+        try write("MZ", to: output)
+        let wine = try makeRuntime(in: folder)
+        let slow = DisplayTarget(name: "Studio Display XDR", pixelWidth: 3840, pixelHeight: 2160, maximumRefreshRate: 60, bestRefreshRate: 120)
+        let fixed = DisplayTarget(name: "Office", pixelWidth: 2560, pixelHeight: 1440, maximumRefreshRate: 60, bestRefreshRate: 60)
+        let fast = DisplayTarget(name: "Built-in", pixelWidth: 3456, pixelHeight: 2234, maximumRefreshRate: 120)
+        XCTAssertNil(fixed.refreshAdvice)
+        XCTAssertNil(fast.refreshAdvice)
+        XCTAssertEqual(slow.availableRefreshRate, 120)
+        XCTAssertTrue(slow.refreshAdvice?.hasPrefix("Studio Display XDR runs at 60 Hz but can run at 120 Hz.") ?? false)
+        let check = LaunchPreflight(output: output, runtime: wine, runtimeName: "Wine", pinnedRuntime: nil, needsRosetta: false,
+                                    freeBytes: nil, displays: [fast, slow, fixed])
+        XCTAssertTrue(check.canLaunch)
+        XCTAssertEqual(check.warnings.map(\.id), ["display"])
+        XCTAssertEqual(LaunchPreflight(output: output, runtime: wine, runtimeName: "Wine", pinnedRuntime: nil, needsRosetta: false,
+                                       freeBytes: nil, displays: [fast, fixed]).level, .ok)
+    }
 }

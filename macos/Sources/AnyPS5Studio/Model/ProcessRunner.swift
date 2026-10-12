@@ -42,6 +42,7 @@ final class ProcessRunner {
     @ObservationIgnored private var nextLineID = 0
     @ObservationIgnored private let ioQueue = DispatchQueue(label: "anyps5.studio.process-io")
     @ObservationIgnored private var pending: [LogLine.Source: Data] = [:]
+    @ObservationIgnored var lineObserver: ((String) -> Void)?
 
     func clear() {
         guard !state.isRunning else { return }
@@ -151,6 +152,9 @@ final class ProcessRunner {
         }
         if lines.count > Self.lineLimit {
             lines.removeFirst(lines.count - Self.lineLimit)
+        }
+        if let lineObserver {
+            for (text, source) in entries where source != .system { lineObserver(text) }
         }
     }
 }

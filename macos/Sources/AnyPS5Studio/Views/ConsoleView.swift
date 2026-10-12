@@ -142,6 +142,12 @@ private struct RunCard: View {
                         .font(.captionText)
                         .foregroundStyle(Theme.textSecondary)
                 }
+                if model.runner.state.isRunning, let rate = model.liveFrameRate {
+                    Chip(text: "\(Int(rate.rounded())) fps" + (model.frameMeter.size.map { " at \($0.text)" } ?? ""),
+                         symbol: "speedometer",
+                         tint: FrameRateMeter.meetsTarget(average: rate, size: model.frameMeter.size) ? Theme.success : Theme.textSecondary)
+                        .help("Presented frames per second over the runtime's last 10-second report")
+                }
                 if !model.runner.state.isRunning, let report = model.lastReport, !report.isEmpty {
                     ReportGrid(report: report)
                 }

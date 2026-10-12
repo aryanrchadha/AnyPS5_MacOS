@@ -15,11 +15,19 @@ struct CrashFinding: Equatable {
     var subject: String? = nil
 
     var advice: String { CrashAdvice.text(for: self) }
+    var winetricksVerb: String? { CrashAdvice.winetricksVerb(for: self) }
 }
 
 enum CrashAdvice {
     static let rerun = "Launch again with Wine errors, then attach the session log and the compatibility report to an issue."
     static let visualCRuntime = ["vcruntime140", "msvcp140", "concrt140", "vcomp140", "vccorlib140"]
+
+    static func winetricksVerb(for finding: CrashFinding) -> String? {
+        guard finding.kind == .missingLibrary, let name = finding.subject?.lowercased() else { return nil }
+        if visualCRuntime.contains(where: { name.hasPrefix($0) }) { return "vcrun2022" }
+        if name.hasPrefix("d3dcompiler_") { return "d3dcompiler_47" }
+        return nil
+    }
 
     static func text(for finding: CrashFinding) -> String {
         let subject = finding.subject ?? ""
@@ -32,14 +40,14 @@ enum CrashAdvice {
             guard ["C000001D", "C0000096"].contains(subject) else { return rerun }
             return "Rosetta 2 could not run an instruction. Re-convert the title if it was converted with an older relinker; otherwise launch again with Wine errors and attach the session log to an issue."
         case .missingLibrary:
-            let name = subject.lowercased()
-            if visualCRuntime.contains(where: { name.hasPrefix($0) }) {
+            switch winetricksVerb(for: finding) {
+            case "vcrun2022":
                 return "\(subject) is part of the Visual C++ runtime. Install it into the Wine prefix with winetricks vcrun2022, or copy \(subject) next to the executable."
-            }
-            if name.hasPrefix("d3dcompiler_") {
+            case "d3dcompiler_47":
                 return "Install the shader compiler into the Wine prefix with winetricks d3dcompiler_47, or copy \(subject) next to the executable."
+            default:
+                return "Copy \(subject) next to the executable, or install it into the Wine prefix."
             }
-            return "Copy \(subject) next to the executable, or install it into the Wine prefix."
         case .gpu:
             if finding.headline.contains("ANYPS5_GPU") {
                 return "ANYPS5_GPU names a device that is not available. Remove it from Extra environment in Options, or set it to part of one of the listed device names."

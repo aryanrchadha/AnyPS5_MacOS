@@ -27,4 +27,19 @@ final class SessionHistoryTests: XCTestCase {
         XCTAssertEqual(SessionHistory.rows(for: makeEntry("Game", sessions: sessions), limit: 2).map { $0.id }, [6, 5])
         XCTAssertTrue(SessionHistory.rows(for: makeEntry("New")).isEmpty)
     }
+
+    func testCSV() {
+        let entry = makeEntry("Game", sessions: [
+            PlaySession(start: Date(timeIntervalSince1970: 0), duration: 600.4, exitCode: 0,
+                        averageFPS: 58.44, lowestFPS: 41, frameSize: FrameRateMeter.Size(width: 3840, height: 2160)),
+            PlaySession(start: Date(timeIntervalSince1970: 3600), duration: 12, exitCode: -9),
+        ])
+        XCTAssertEqual(SessionHistory.csv(for: entry), """
+        start,duration_seconds,exit_code,average_fps,lowest_fps,width,height
+        1970-01-01T00:00:00Z,600,0,58.4,41.0,3840,2160
+        1970-01-01T01:00:00Z,12,-9,,,,
+
+        """)
+        XCTAssertEqual(SessionHistory.csv(for: makeEntry("New")), SessionHistory.csvHeader + "\n")
+    }
 }

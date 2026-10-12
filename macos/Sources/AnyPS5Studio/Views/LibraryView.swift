@@ -265,6 +265,8 @@ private struct LibraryCard: View {
             Button("Launch with Wine Errors") { model.launch(entry, diagnostic: true) }
                 .disabled(!model.launchableEntries.contains { $0.id == entry.id } || model.runner.state.isRunning)
             Button("Export Diagnostics…") { model.exportDiagnostics(for: entry) }
+            Button("Export Sessions…") { model.exportSessions(for: entry) }
+                .disabled(entry.sessions?.isEmpty != false)
             Divider()
             Button("Remove from Library", role: .destructive) { model.library.remove(entry) }
             Button("Move Conversion to Trash…", role: .destructive) { model.moveToTrash(entry) }

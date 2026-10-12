@@ -84,7 +84,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - extra variables;
    - backing up saves on launch: before each launch from Studio, `_sd/` is archived as an `Auto` backup in the save backups folder. The newest 5 automatic backups are kept; manual backups are never removed.
 
-   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). With more than one session it also lists the 5 most recent, newest first, with their start, length, measured frame rate and exit code, so runs before and after a settings change can be compared. Launchers created with *Add to Applications* use the same settings.
+   The panel shows the size of the title's `shader_cache/` folder, lets you clear it, and lists play sessions (count, total time, last exit code). With more than one session it also lists the 5 most recent, newest first, with their start, length, measured frame rate and exit code, so runs before and after a settings change can be compared. *Export Sessions…* in a card's context menu saves every session as CSV (`start`, `duration_seconds`, `exit_code`, `average_fps`, `lowest_fps`, `width`, `height`; start times in ISO 8601 UTC, empty cells for unmeasured sessions) for a spreadsheet or a bug report. Launchers created with *Add to Applications* use the same settings.
 
    Each launch from Studio writes its console output to `~/Library/Logs/AnyPS5 Studio/<Title>/Session <date>.log`, which Console.app can also open. Lines from standard error start with `!` and Studio's own notes with `#`. The newest 10 logs per title are kept. *Open last session log* is in the Options panel and the card's context menu.
 

@@ -1133,6 +1133,21 @@ final class AppModel {
         }
     }
 
+    func exportSessions(for entry: LibraryEntry) {
+        guard entry.sessions?.isEmpty == false else { return }
+        let panel = NSSavePanel()
+        panel.title = "Export sessions"
+        panel.nameFieldStringValue = "\(LauncherBuilder.bundleName(for: entry.title)) sessions.csv"
+        panel.allowedContentTypes = [.commaSeparatedText]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try SessionHistory.csv(for: entry).write(to: url, atomically: true, encoding: .utf8)
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } catch {
+            banner = "Exporting sessions failed: \(error.localizedDescription)"
+        }
+    }
+
     func saveLog() {
         let panel = NSSavePanel()
         panel.title = "Save console output"

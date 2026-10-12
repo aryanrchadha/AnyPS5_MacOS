@@ -211,6 +211,32 @@ struct SessionSummary: View {
             Text(Self.text(for: entry))
                 .font(.captionText)
                 .foregroundStyle(Theme.textSecondary)
+            if sessions.count > 1 {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(SessionHistory.rows(for: entry)) { row in
+                        HStack(spacing: 10) {
+                            Text(row.start.formatted(date: .abbreviated, time: .shortened))
+                                .foregroundStyle(Theme.textSecondary)
+                            Text(row.duration)
+                                .monospacedDigit()
+                                .foregroundStyle(Theme.textTertiary)
+                            Spacer(minLength: 8)
+                            if let frameRate = row.frameRate {
+                                Text(frameRate)
+                                    .monospacedDigit()
+                                    .foregroundStyle(row.meetsTarget ? Theme.success : Theme.textSecondary)
+                            }
+                            Text(row.succeeded ? "OK" : "Exit \(row.exitCode)")
+                                .monospacedDigit()
+                                .foregroundStyle(row.succeeded ? Theme.success : Theme.failure)
+                        }
+                        .font(.captionText)
+                        .lineLimit(1)
+                    }
+                }
+                .padding(.vertical, 2)
+                .accessibilityLabel("Recent sessions")
+            }
             if let measured = sessions.last(where: { $0.frameRateText != nil }), let text = measured.frameRateText,
                let average = measured.averageFPS {
                 Label("Frame rate: \(text)", systemImage: "speedometer")

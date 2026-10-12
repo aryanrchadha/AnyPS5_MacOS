@@ -33,6 +33,11 @@ struct LaunchOptionsPanel: View {
                           flag: "MTL_HUD_ENABLED=1",
                           isOn: $profile.metalHUD)
                 Hairline()
+                OptionRow(title: "Measure frame rate",
+                          detail: "Turn on the runtime's draw profiling, which reports presented frames every 10 seconds, and show frames per second and the output resolution in the Console and under Sessions. Profiling adds overhead, so the measured rate is a lower bound.",
+                          flag: "\(FrameRateMeter.environmentKey)=1",
+                          isOn: $profile.measureFrameRate)
+                Hairline()
                 OptionRow(title: "Disable shader cache",
                           detail: "Recompile every shader on launch. For troubleshooting; expect more stutter.",
                           flag: "ANYPS5_NO_SHADER_CACHE=1",
@@ -206,6 +211,13 @@ struct SessionSummary: View {
             Text(Self.text(for: entry))
                 .font(.captionText)
                 .foregroundStyle(Theme.textSecondary)
+            if let measured = sessions.last(where: { $0.frameRateText != nil }), let text = measured.frameRateText,
+               let average = measured.averageFPS {
+                Label("Frame rate: \(text)", systemImage: "speedometer")
+                    .font(.captionText)
+                    .foregroundStyle(FrameRateMeter.meetsTarget(average: average, size: measured.frameSize) ? Theme.success : Theme.textSecondary)
+                    .help("Measured \(measured.start.formatted(date: .abbreviated, time: .shortened)) with \(FrameRateMeter.environmentKey); a lower bound")
+            }
             if let last = sessions.last, last.exitCode != 0 {
                 Text("The last session exited with code \(last.exitCode). Its log has the full output.")
                     .font(.captionText)

@@ -46,6 +46,8 @@ final class AppModel {
 
     var route: Route = .convert
     var librarySearch = ""
+    var liveFrameRate: Double?
+    @ObservationIgnored var frameMeter = FrameRateMeter()
     var libraryStatus: LibraryStatusFilter = .all
     var settings: ConversionSettings {
         didSet { persistSettings() }
@@ -145,6 +147,12 @@ final class AppModel {
 
     var parsedWineEnvironment: [String: String] {
         EnvironmentText.parse(wineEnvironment)
+    }
+
+    private func observeFrames(_ text: String) {
+        guard let rate = frameMeter.ingest(text, at: Date()) else { return }
+        liveFrameRate = rate
+        runner.note("Frame rate: \(Int(rate.rounded())) fps over the last report" + (frameMeter.size.map { " at \($0.text)" } ?? ""))
     }
 
     func launchEnvironment(for output: URL) -> [String: String] {
@@ -401,13 +409,28 @@ final class AppModel {
         let overrides = environment.keys.sorted().map { "\($0)=\(environment[$0] ?? "")" }.joined(separator: " ")
         if !overrides.isEmpty { runner.note("Environment: \(overrides)") }
         let started = Date()
+        frameMeter = FrameRateMeter()
+        liveFrameRate = nil
+        if environment[FrameRateMeter.environmentKey] != nil {
+            runner.note("Measuring frame rate from the runtime's [flip] reports, every 10 seconds. Profiling adds overhead, so the rate is a lower bound.")
+            runner.lineObserver = { [weak self] text in self?.observeFrames(text) }
+        } else {
+            runner.lineObserver = nil
+        }
         runner.run(label: "Launch via \(wine.name)", executable: wine.executable, arguments: [output.path],
                    workingDirectory: output.deletingLastPathComponent(),
                    environment: environment) { [weak self] code in
             guard let self else { return }
             let duration = Date().timeIntervalSince(started)
-            self.library.addSession(PlaySession(start: started, duration: duration, exitCode: code), for: output)
+            self.runner.lineObserver = nil
+            let meter = self.frameMeter
+            self.liveFrameRate = nil
+            self.library.addSession(PlaySession(start: started, duration: duration, exitCode: code,
+                                                averageFPS: meter.average, lowestFPS: meter.lowest, frameSize: meter.size), for: output)
             self.runner.note("Session ended after \(Int(duration))s with exit code \(code).")
+            if let summary = meter.summary {
+                self.runner.note("Frame rate: \(summary).")
+            }
             let title = entry?.title ?? output.deletingPathExtension().lastPathComponent
             let lines = self.runner.lines.filter { $0.id > firstLine }
             self.writeSessionLog(lines, title: title, titleId: entry?.titleId, started: started, duration: duration, exitCode: code)

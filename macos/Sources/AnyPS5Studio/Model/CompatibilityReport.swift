@@ -23,6 +23,9 @@ struct CompatibilityReport {
         if let last = sessions.last {
             rows.append(("Play time", "\(PlayActivity.format(entry.playTime)) over \(sessions.count == 1 ? "1 session" : "\(sessions.count) sessions")"))
             rows.append(("Last exit code", "\(last.exitCode)"))
+            if let measured = sessions.last(where: { $0.frameRateText != nil }), let text = measured.frameRateText {
+                rows.append(("Frame rate", text))
+            }
             if last.exitCode != 0, let crash, !crash.findings.isEmpty {
                 rows.append(("Likely cause", Self.redact(crash.findings.map(\.headline).joined(separator: "; "), home: home)))
             }

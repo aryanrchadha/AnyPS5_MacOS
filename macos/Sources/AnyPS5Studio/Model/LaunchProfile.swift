@@ -8,10 +8,11 @@ struct LaunchProfile: Codable, Equatable {
     var quietWine = false
     var wineRuntimePath: String?
     var separatePrefix = false
+    var measureFrameRate = false
 
     init(metalHUD: Bool = false, disableShaderCache: Bool = false, extraEnvironment: String = "",
          backupSavesOnLaunch: Bool = false, quietWine: Bool = false, wineRuntimePath: String? = nil,
-         separatePrefix: Bool = false) {
+         separatePrefix: Bool = false, measureFrameRate: Bool = false) {
         self.metalHUD = metalHUD
         self.disableShaderCache = disableShaderCache
         self.extraEnvironment = extraEnvironment
@@ -19,6 +20,7 @@ struct LaunchProfile: Codable, Equatable {
         self.quietWine = quietWine
         self.wineRuntimePath = wineRuntimePath
         self.separatePrefix = separatePrefix
+        self.measureFrameRate = measureFrameRate
     }
 
     init(from decoder: Decoder) throws {
@@ -30,6 +32,7 @@ struct LaunchProfile: Codable, Equatable {
         quietWine = try container.decodeIfPresent(Bool.self, forKey: .quietWine) ?? false
         wineRuntimePath = try container.decodeIfPresent(String.self, forKey: .wineRuntimePath)
         separatePrefix = try container.decodeIfPresent(Bool.self, forKey: .separatePrefix) ?? false
+        measureFrameRate = try container.decodeIfPresent(Bool.self, forKey: .measureFrameRate) ?? false
     }
 
     var environment: [String: String] {
@@ -37,6 +40,7 @@ struct LaunchProfile: Codable, Equatable {
         result.merge(EnvironmentText.parse(extraEnvironment)) { _, explicit in explicit }
         if metalHUD { result["MTL_HUD_ENABLED"] = "1" }
         if disableShaderCache { result["ANYPS5_NO_SHADER_CACHE"] = "1" }
+        if measureFrameRate { result[FrameRateMeter.environmentKey] = "1" }
         return result
     }
 
@@ -57,6 +61,14 @@ struct PlaySession: Codable, Equatable {
     var start: Date
     var duration: TimeInterval
     var exitCode: Int32
+    var averageFPS: Double? = nil
+    var lowestFPS: Double? = nil
+    var frameSize: FrameRateMeter.Size? = nil
+
+    var frameRateText: String? {
+        guard let averageFPS, let lowestFPS else { return nil }
+        return FrameRateMeter.summary(average: averageFPS, lowest: lowestFPS, size: frameSize)
+    }
 }
 
 enum EnvironmentText {

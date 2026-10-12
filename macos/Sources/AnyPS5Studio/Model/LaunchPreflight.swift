@@ -15,6 +15,25 @@ struct PreflightCheck: Identifiable, Equatable {
     let detail: String
 }
 
+enum PowerState: Equatable {
+    case normal
+    case lowPower
+    case hot(critical: Bool)
+
+    var detail: String? {
+        switch self {
+        case .normal:
+            return nil
+        case .lowPower:
+            return "Low Power Mode is on, which lowers CPU and GPU clocks. Turn it off in System Settings \u{203A} Battery for full performance."
+        case .hot(let critical):
+            return critical
+                ? "This Mac is critically hot and macOS is throttling it hard. Let it cool before playing."
+                : "This Mac is hot and macOS is throttling the CPU and GPU. Frame rates will be lower until it cools."
+        }
+    }
+}
+
 struct LaunchPreflight: Equatable {
     static let minimumFreeBytes: Int64 = 2 * 1024 * 1024 * 1024
 
@@ -38,7 +57,8 @@ struct LaunchPreflight: Equatable {
     }
 
     init(output: URL, runtime: URL?, runtimeName: String?, pinnedRuntime: String?, needsRosetta: Bool,
-         freeBytes: Int64?, displays: [DisplayTarget] = [], fileManager: FileManager = .default) {
+         freeBytes: Int64?, displays: [DisplayTarget] = [], power: [PowerState] = [],
+         fileManager: FileManager = .default) {
         var checks: [PreflightCheck] = []
         var isDirectory: ObjCBool = false
         let exists = fileManager.fileExists(atPath: output.path, isDirectory: &isDirectory) && !isDirectory.boolValue
@@ -85,6 +105,11 @@ struct LaunchPreflight: Equatable {
                 id: "disk", title: "Free space",
                 level: low ? .warning : .ok,
                 detail: low ? "Only \(free) free. Saves and the shader cache may fail to write." : "\(free) free"))
+        }
+        let powerDetails = power.compactMap(\.detail)
+        if !powerDetails.isEmpty {
+            checks.append(PreflightCheck(id: "power", title: "Performance", level: .warning,
+                                         detail: powerDetails.joined(separator: " ")))
         }
         let advice = displays.compactMap(\.refreshAdvice)
         if !advice.isEmpty {

@@ -95,4 +95,23 @@ final class LaunchPreflightTests: XCTestCase {
         XCTAssertEqual(LaunchPreflight(output: output, runtime: wine, runtimeName: "Wine", pinnedRuntime: nil, needsRosetta: false,
                                        freeBytes: nil, displays: [fast, fixed]).level, .ok)
     }
+
+    func testLowPowerAndHeatWarn() throws {
+        let folder = try temporaryDirectory()
+        let output = folder.appendingPathComponent("Game/Game.exe")
+        try write("MZ", to: output)
+        let wine = try makeRuntime(in: folder)
+        func check(_ power: [PowerState]) -> LaunchPreflight {
+            LaunchPreflight(output: output, runtime: wine, runtimeName: "Wine", pinnedRuntime: nil, needsRosetta: false,
+                            freeBytes: nil, power: power)
+        }
+        XCTAssertEqual(check([]).level, .ok)
+        XCTAssertEqual(check([.normal]).level, .ok)
+        let both = check([.lowPower, .hot(critical: false)])
+        XCTAssertTrue(both.canLaunch)
+        XCTAssertEqual(both.warnings.map(\.id), ["power"])
+        XCTAssertTrue(both.warnings[0].detail.hasPrefix("Low Power Mode is on"))
+        XCTAssertTrue(both.warnings[0].detail.contains("throttling the CPU and GPU"))
+        XCTAssertTrue(check([.hot(critical: true)]).warnings[0].detail.contains("critically hot"))
+    }
 }

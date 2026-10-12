@@ -6,6 +6,7 @@ struct LaunchOptionsPanel: View {
     let output: URL
     @State var profile = LaunchProfile()
     @State var cache: (files: Int, bytes: Int64) = (0, 0)
+    @State var prefix: (files: Int, bytes: Int64)?
     @State var loaded = false
     @State var preflight: LaunchPreflight?
 
@@ -91,6 +92,30 @@ struct LaunchOptionsPanel: View {
                     .disabled(cache.files == 0)
                     .opacity(cache.files == 0 ? 0.4 : 1)
                 }
+                if profile.separatePrefix || prefix != nil {
+                    Hairline()
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Wine prefix")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Theme.textPrimary)
+                            Text(prefix.map { "\($0.files) files \u{B7} \(ByteCountFormatter.string(fromByteCount: $0.bytes, countStyle: .file))" }
+                                 ?? "Created by Wine on the next launch")
+                                .font(.captionText)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer()
+                        if prefix != nil {
+                            GhostButton(title: "Reveal", symbol: "folder") { model.revealWinePrefix(for: output) }
+                                .fixedSize()
+                            GhostButton(title: "Reset\u{2026}", symbol: "arrow.counterclockwise") {
+                                model.resetWinePrefix(for: output)
+                                prefix = model.winePrefixSize(for: output)
+                            }
+                            .fixedSize()
+                        }
+                    }
+                }
                 if let entry, let sessions = entry.sessions, !sessions.isEmpty {
                     Hairline()
                     SessionSummary(entry: entry)
@@ -104,6 +129,7 @@ struct LaunchOptionsPanel: View {
             guard !loaded else { return }
             profile = entry?.launchProfile ?? LaunchProfile()
             cache = model.shaderCacheSize(for: output)
+            prefix = model.winePrefixSize(for: output)
             preflight = model.preflight(for: output)
             loaded = true
         }

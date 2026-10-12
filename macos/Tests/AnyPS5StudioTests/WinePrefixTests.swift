@@ -44,4 +44,17 @@ final class WinePrefixTests: XCTestCase {
         XCTAssertNil(verb("steam_api64.dll"))
         XCTAssertNil(CrashFinding(kind: .exception, headline: "Uncaught X", detail: nil, subject: "X").winetricksVerb)
     }
+
+    func testExistsOnlyForAFolder() throws {
+        let root = try temporaryDirectory()
+        let game = root.appendingPathComponent("Game/eboot.exe")
+        try write("MZ", to: game)
+        XCTAssertFalse(WinePrefix.exists(besides: game))
+        try write("file", to: WinePrefix.folder(besides: game))
+        XCTAssertFalse(WinePrefix.exists(besides: game))
+        try FileManager.default.removeItem(at: WinePrefix.folder(besides: game))
+        try write("reg", to: WinePrefix.folder(besides: game).appendingPathComponent("system.reg"))
+        XCTAssertTrue(WinePrefix.exists(besides: game))
+        XCTAssertEqual(ShaderCache.size(at: WinePrefix.folder(besides: game)).files, 1)
+    }
 }

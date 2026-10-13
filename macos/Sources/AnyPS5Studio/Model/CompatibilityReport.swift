@@ -16,7 +16,10 @@ struct CompatibilityReport {
             ("Mac", mac),
             ("macOS", macOS),
         ]
+        if let publisher = entry.publisher { rows.insert(("Publisher", publisher.name), at: 2) }
         if let runtime { rows.append(("Runtime", runtime)) }
+        let options = entry.launchProfile.optionTitles
+        if !options.isEmpty { rows.append(("Launch options", options.joined(separator: ", "))) }
         rows.append(("Relinker", entry.relinkerCommit.map { String($0.prefix(8)) } ?? "unknown"))
         rows.append(("AnyPS5 Studio", appVersion))
         let sessions = entry.sessions ?? []

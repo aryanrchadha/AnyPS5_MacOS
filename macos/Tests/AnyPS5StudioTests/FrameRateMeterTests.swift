@@ -80,4 +80,19 @@ final class FrameRateMeterTests: XCTestCase {
         XCTAssertEqual(entry.lastMeasuredSession?.averageFPS, 58)
         XCTAssertNil(makeEntry("New").lastMeasuredSession)
     }
+
+    func testRefreshCap() {
+        let studio = DisplayTarget(name: "Studio Display", pixelWidth: 5120, pixelHeight: 2880, maximumRefreshRate: 60)
+        let tv = DisplayTarget(name: "TV", pixelWidth: 3840, pixelHeight: 2160, maximumRefreshRate: 60, bestRefreshRate: 120)
+        let promotion = DisplayTarget(name: "Built-in", pixelWidth: 3456, pixelHeight: 2234, maximumRefreshRate: 120)
+        XCTAssertEqual(FrameRateMeter.refreshCap(average: 59.2, displays: [promotion, studio])?.name, "Studio Display")
+        XCTAssertNil(FrameRateMeter.refreshCap(average: 45, displays: [studio]))
+        XCTAssertNil(FrameRateMeter.refreshCap(average: 119, displays: [promotion]))
+        XCTAssertNil(FrameRateMeter.refreshCap(average: 60, displays: [DisplayTarget(name: "Unknown", pixelWidth: 1, pixelHeight: 1, maximumRefreshRate: 0)]))
+        let fixed = FrameRateMeter.refreshAdvice(average: 60.4, displays: [studio])
+        XCTAssertEqual(fixed, "The average matches the 60 Hz refresh rate of Studio Display. Frames are presented with vsync, so this display caps the frame rate at 60 FPS; the title may also pace itself at that rate. A higher frame rate needs a display that refreshes at 120 Hz.")
+        let switchable = FrameRateMeter.refreshAdvice(average: 58, displays: [tv])
+        XCTAssertTrue(switchable?.hasSuffix("Choose 120 Hz under Refresh rate in System Settings \u{203A} Displays and measure again.") == true)
+        XCTAssertNil(FrameRateMeter.refreshAdvice(average: 30, displays: [tv]))
+    }
 }

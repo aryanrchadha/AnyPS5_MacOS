@@ -24,7 +24,7 @@ The System page's checks include *Performance*, which turns yellow while Low Pow
 - On Apple Silicon, titles run through Rosetta 2, Wine and MoltenVK on top of the runtime's shader recompilation; each layer costs CPU and GPU time.
 - Whether a title starts at all depends on the system library coverage it needs. See [COMPATIBILITY.md](COMPATIBILITY.md) for verified titles.
 
-Measure rather than assume: enable the Metal Performance HUD for the title and read the frame rate and frame time during play, or turn on *Measure frame rate* in its launch options to have each session's average and lowest frame rate and output size recorded in the Library. When the average matches a connected display's refresh rate, the launch options note that vsync is capping it there (the title may also pace itself at that rate) and, if the display offers a faster mode, open the Displays settings to choose it.
+Measure rather than assume: enable the Metal Performance HUD for the title and read the frame rate and frame time during play, or turn on *Measure frame rate* in its launch options to have each session's average and lowest frame rate and output size recorded in the Library. The launch options compare the last measurement with the one before it, so you can see whether a change helped, and say when the two ran at different output sizes. When the average matches a connected display's refresh rate, the launch options note that vsync is capping it there (the title may also pace itself at that rate) and, if the display offers a faster mode, open the Displays settings to choose it.
 
 ## EA titles
 

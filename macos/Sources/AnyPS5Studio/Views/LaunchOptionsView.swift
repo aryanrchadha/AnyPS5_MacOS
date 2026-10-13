@@ -309,6 +309,12 @@ struct SessionSummary: View {
                     .font(.captionText)
                     .foregroundStyle(FrameRateMeter.meetsTarget(average: average, size: measured.frameSize) ? Theme.success : Theme.textSecondary)
                     .help("Measured \(measured.start.formatted(date: .abbreviated, time: .shortened)) with \(FrameRateMeter.environmentKey); a lower bound")
+                if let change = SessionHistory.frameRateChange(for: entry) {
+                    Text(change)
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textTertiary)
+                        .padding(.leading, 20)
+                }
                 if let advice = FrameRateMeter.refreshAdvice(average: average, displays: displays) {
                     HStack(alignment: .top, spacing: 10) {
                         Label(advice, systemImage: "display")

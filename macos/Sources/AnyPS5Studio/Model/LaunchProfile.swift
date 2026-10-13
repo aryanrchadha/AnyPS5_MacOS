@@ -44,6 +44,12 @@ struct LaunchProfile: Codable, Equatable {
         return result
     }
 
+    var optionTitles: [String] {
+        [(metalHUD, "Metal HUD"), (disableShaderCache, "No shader cache"), (backupSavesOnLaunch, "Back up saves"),
+         (quietWine, "Quiet Wine"), (separatePrefix, "Separate Wine prefix"), (measureFrameRate, "Measure frame rate")]
+            .filter(\.0).map(\.1)
+    }
+
     func merged(over base: [String: String]) -> [String: String] {
         base.merging(environment) { _, profile in profile }
     }

@@ -141,4 +141,20 @@ final class CrashSummaryTests: XCTestCase {
         XCTAssertFalse(CrashAdvice.isNetworkFunction("sceFontFtSupportOtf"))
         XCTAssertFalse(CrashAdvice.isNetworkFunction("5nc2gdLNsok"))
     }
+
+    func testCompatibilityReportListsPublisherAndLaunchOptions() {
+        var entry = makeEntry("Game", titleId: "PPSA00001")
+        entry.contentId = "EP0006-PPSA00001_00-SAMPLEGAME000000"
+        entry.profile = LaunchProfile(extraEnvironment: "TOKEN=secret", quietWine: true, measureFrameRate: true)
+        let report = CompatibilityReport(entry: entry, mac: "Apple M2", macOS: "macOS 15", runtime: "Wine 9",
+                                         appVersion: "1", home: "/Users/pat").markdown
+        let rows = report.split(separator: "\n").map(String.init)
+        XCTAssertEqual(Array(rows[3...5]), ["| Status | Not set |", "| Target | Windows PE |", "| Publisher | Electronic Arts |"])
+        XCTAssertTrue(rows.contains("| Launch options | Quiet Wine, Measure frame rate |"))
+        XCTAssertFalse(report.contains("secret"))
+
+        let plain = CompatibilityReport(entry: makeEntry("Other"), mac: "M", macOS: "m", runtime: nil, appVersion: "1").markdown
+        XCTAssertFalse(plain.contains("Publisher"))
+        XCTAssertFalse(plain.contains("Launch options"))
+    }
 }

@@ -29,10 +29,19 @@ enum CrashAdvice {
         return nil
     }
 
+    static let networkPrefixes = ["sceNp", "sceNet", "sceHttp", "sceSsl"]
+
+    static func isNetworkFunction(_ name: String) -> Bool {
+        networkPrefixes.contains { name.hasPrefix($0) } && !name.hasPrefix("sceNpTrophy")
+    }
+
     static func text(for finding: CrashFinding) -> String {
         let subject = finding.subject ?? ""
         switch finding.kind {
         case .missingFunction:
+            if isNetworkFunction(subject) {
+                return "\(subject) is a network or PlayStation Network function the runtime does not implement yet. A title that checks online services at startup stops here, and no setting avoids it. Copy the compatibility report and attach it to an issue."
+            }
             return "No setting fixes this: the runtime has to implement \(subject). Copy the compatibility report and attach it to an issue."
         case .exception:
             return rerun

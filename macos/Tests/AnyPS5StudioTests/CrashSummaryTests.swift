@@ -126,4 +126,19 @@ final class CrashSummaryTests: XCTestCase {
         XCTAssertEqual(loader.findings.map(\.kind), [.gpu, .gpu])
         XCTAssertTrue(loader.findings[0].advice.contains("MoltenVK"))
     }
+
+    func testNetworkFunctionAdvice() {
+        let summary = CrashSummary(lines: [
+            "! [coredump] uncaught C++ exception 0x7ff1 of type std::runtime_error, what(): sceNpCheckNpAvailability not implemented",
+            "! [coredump] uncaught C++ exception 0x7ff2 of type std::runtime_error, what(): sceNpTrophy2CreateContext not implemented",
+        ])
+        XCTAssertEqual(summary.findings.map(\.subject), ["sceNpCheckNpAvailability", "sceNpTrophy2CreateContext"])
+        XCTAssertTrue(summary.advice[0].hasPrefix("sceNpCheckNpAvailability is a network or PlayStation Network function"))
+        XCTAssertTrue(summary.advice[1].hasPrefix("No setting fixes this"))
+        XCTAssertTrue(CrashAdvice.isNetworkFunction("sceNetConnect"))
+        XCTAssertTrue(CrashAdvice.isNetworkFunction("sceHttpCreateTemplate"))
+        XCTAssertTrue(CrashAdvice.isNetworkFunction("sceSslInit"))
+        XCTAssertFalse(CrashAdvice.isNetworkFunction("sceFontFtSupportOtf"))
+        XCTAssertFalse(CrashAdvice.isNetworkFunction("5nc2gdLNsok"))
+    }
 }

@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <charconv>
 #include <filesystem>
+#include <locale>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -231,8 +232,10 @@ JsonValue parseJsonNumber(const std::string& text, std::size_t& position) {
     value.type = JsonType::Number;
     value.numberText = text.substr(start, position - start);
     const auto& number = value.numberText;
-    const auto converted = std::from_chars(number.data(), number.data() + number.size(), value.numberValue);
-    if (converted.ec != std::errc{} || converted.ptr != number.data() + number.size())
+    std::istringstream stream(number);
+    stream.imbue(std::locale::classic());
+    stream >> value.numberValue;
+    if (stream.fail() || stream.peek() != std::char_traits<char>::eof())
         throw std::runtime_error("number outside supported range in param.json");
     return value;
 }

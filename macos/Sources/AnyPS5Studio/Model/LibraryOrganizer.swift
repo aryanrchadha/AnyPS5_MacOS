@@ -22,8 +22,11 @@ enum LibraryStatusFilter: Hashable, Identifiable {
     case status(PlayStatus)
     case measured
     case meetsTarget
+    case publisher(Publisher)
 
-    static var allCases: [LibraryStatusFilter] { [.all, .notSet] + PlayStatus.allCases.map { .status($0) } + [.measured, .meetsTarget] }
+    static var allCases: [LibraryStatusFilter] {
+        [.all, .notSet] + PlayStatus.allCases.map { .status($0) } + [.measured, .meetsTarget] + Publisher.allCases.map { .publisher($0) }
+    }
 
     var id: String {
         switch self {
@@ -32,6 +35,7 @@ enum LibraryStatusFilter: Hashable, Identifiable {
         case .status(let status): status.rawValue
         case .measured: "measured"
         case .meetsTarget: "meetsTarget"
+        case .publisher(let publisher): "publisher-\(publisher.rawValue)"
         }
     }
 
@@ -42,6 +46,7 @@ enum LibraryStatusFilter: Hashable, Identifiable {
         case .status(let status): status.title
         case .measured: "Frame rate measured"
         case .meetsTarget: "Meets 4K 120"
+        case .publisher(let publisher): "\(publisher.shortName) titles"
         }
     }
 
@@ -55,6 +60,7 @@ enum LibraryStatusFilter: Hashable, Identifiable {
             entry.lastMeasuredSession.map { session in
                 session.averageFPS.map { FrameRateMeter.meetsTarget(average: $0, size: session.frameSize) } ?? false
             } ?? false
+        case .publisher(let publisher): entry.publisher == publisher
         }
     }
 }
@@ -74,6 +80,7 @@ enum LibraryOrganizer {
             $0.title.localizedCaseInsensitiveContains(trimmed) || ($0.titleId ?? "").localizedCaseInsensitiveContains(trimmed)
                 || ($0.notes ?? "").localizedCaseInsensitiveContains(trimmed)
                 || ($0.status?.title ?? "").localizedCaseInsensitiveContains(trimmed)
+                || ($0.publisher?.name ?? "").localizedCaseInsensitiveContains(trimmed)
         }
         let sorted: [LibraryEntry]
         switch sort {
@@ -134,6 +141,8 @@ struct DiagnosticsReport {
             lines += ["", "[Title]",
                       "Title: \(entry.title)",
                       "Title ID: \(entry.titleId ?? "unknown")",
+                      "Content ID: \(entry.contentId ?? "unknown")",
+                      "Publisher: \(entry.publisher?.name ?? "unknown")",
                       "Target: \(entry.target.title)",
                       "Output: \(entry.output.path)",
                       "Converted: \(ISO8601DateFormatter().string(from: entry.convertedAt))",

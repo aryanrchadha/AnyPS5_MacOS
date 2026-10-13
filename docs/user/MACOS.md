@@ -26,6 +26,16 @@ The System page's checks include *Performance*, which turns yellow while Low Pow
 
 Measure rather than assume: enable the Metal Performance HUD for the title and read the frame rate and frame time during play, or turn on *Measure frame rate* in its launch options to have each session's average and lowest frame rate and output size recorded in the Library. When the average matches a connected display's refresh rate, the launch options note that vsync is capping it there (the title may also pace itself at that rate) and, if the display offers a faster mode, open the Displays settings to choose it.
 
+## EA titles
+
+AnyPS5 Studio reads the content ID from a title's `sce_sys/param.json` when you pick it, and from the original game folder for titles already in the Library. Titles published by Electronic Arts (service IDs `UP0006` and `EP0006`) get an *EA* chip in the Library and on the Convert page, an *EA titles* entry in the Library's status filter, and a section in their launch options that explains:
+
+- **Online modes.** EA titles reach EA's servers through PlayStation Network. The runtime answers most network checks as signed out, and some network functions are not implemented yet, so a title that calls one stops with a "not implemented" error naming it. Ultimate Team, online seasons, co-op, EA account linking and other online modes are unavailable; only offline modes can work.
+- **Rosters and live content.** Roster updates, live tuning and content a title downloads while running are not fetched. Include the title's installed updates when you dump it.
+- **Frame rate.** A title cannot run faster than its PS5 version targets. Choose its 120 Hz or performance mode if it has one, and turn on *Measure frame rate* to see what it reaches. Nothing in AnyPS5 is specific to EA's engines, and no EA title is listed as working in [COMPATIBILITY.md](COMPATIBILITY.md).
+
+The content ID and publisher are also included in diagnostics exports. Searching the Library for "Electronic Arts" finds these titles.
+
 ## Build
 
 Requirements: Xcode 15 or newer (or the Command Line Tools with Swift 5.9+), CMake 3.20+. Ninja is used when present.

@@ -71,7 +71,7 @@ final class LibraryOrganizerTests: XCTestCase {
         XCTAssertEqual(LibrarySort.frameRate.title, "FPS")
         XCTAssertEqual(titles(.meetsTarget), ["Fast"])
         XCTAssertEqual(Set(LibraryStatusFilter.allCases.map(\.id)).count, LibraryStatusFilter.allCases.count)
-        XCTAssertEqual(LibraryStatusFilter.allCases.suffix(2).map(\.title), ["Frame rate measured", "Meets 4K 120"])
+        XCTAssertEqual(LibraryStatusFilter.allCases.suffix(3).map(\.title), ["Frame rate measured", "Meets 4K 120", "EA titles"])
     }
 
     func testCountText() {

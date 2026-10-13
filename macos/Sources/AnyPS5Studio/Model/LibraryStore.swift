@@ -31,6 +31,7 @@ struct LibraryEntry: Codable, Identifiable, Equatable {
     var id = UUID()
     var title: String
     var titleId: String?
+    var contentId: String?
     var source: URL
     var output: URL
     var target: TargetPlatform
@@ -114,6 +115,7 @@ final class LibraryStore {
             entry.sessions = entry.sessions ?? previous.sessions
             entry.status = entry.status ?? previous.status
             entry.notes = entry.notes ?? previous.notes
+            entry.contentId = entry.contentId ?? previous.contentId
         }
         entries.removeAll { $0.output.standardizedFileURL == entry.output.standardizedFileURL }
         entries.insert(entry, at: 0)
@@ -128,6 +130,16 @@ final class LibraryStore {
         guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         entries[index] = entry
         save()
+    }
+
+    func fillContentIds(_ read: (URL) -> String?) {
+        var changed = false
+        for index in entries.indices where entries[index].contentId == nil {
+            guard let contentId = read(entries[index].source) else { continue }
+            entries[index].contentId = contentId
+            changed = true
+        }
+        if changed { save() }
     }
 
     func setProfile(_ profile: LaunchProfile, for output: URL) {
@@ -168,6 +180,7 @@ final class LibraryStore {
             if current.profile == nil { current.profile = incoming.profile }
             if current.status == nil { current.status = incoming.status }
             if current.notes == nil { current.notes = incoming.notes }
+            if current.contentId == nil { current.contentId = incoming.contentId }
             let known = Set((current.sessions ?? []).map { "\($0.start.timeIntervalSince1970)|\($0.duration)" })
             let extra = (incoming.sessions ?? []).filter { !known.contains("\($0.start.timeIntervalSince1970)|\($0.duration)") }
             if !extra.isEmpty {

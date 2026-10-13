@@ -27,6 +27,10 @@ struct LaunchOptionsPanel: View {
                     PreflightList(preflight: preflight)
                     Hairline()
                 }
+                if let publisher = entry?.publisher {
+                    PublisherNotesView(publisher: publisher, measuring: $profile.measureFrameRate)
+                    Hairline()
+                }
                 RuntimeRow(selection: $profile.wineRuntimePath)
                 Hairline()
                 OptionRow(title: "Metal Performance HUD",
@@ -220,6 +224,41 @@ struct RuntimeRow: View {
             .labelsHidden()
             .frame(maxWidth: 190)
         }
+    }
+}
+
+struct PublisherNotesView: View {
+    let publisher: Publisher
+    @Binding var measuring: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "building.2")
+                    .font(.system(size: 12, weight: .light))
+                Text("\(publisher.name) title")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(Theme.textPrimary)
+            ForEach(publisher.notes, id: \.self) { note in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(note.title)
+                        .font(.captionText.weight(.medium))
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(note.detail)
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            if !measuring {
+                Button("Turn on Measure frame rate") { measuring = true }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

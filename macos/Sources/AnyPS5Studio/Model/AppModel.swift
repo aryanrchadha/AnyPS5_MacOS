@@ -108,6 +108,7 @@ final class AppModel {
         if let aside = library.setAside {
             banner = "The Library file could not be read, so it was moved to \(aside.path) and the Library starts empty. Import it from there if it was an export, or send it with a bug report."
         }
+        library.fillContentIds { ParamJson.read(besides: $0).contentId }
     }
 
     var outputExecutable: URL? {
@@ -356,6 +357,7 @@ final class AppModel {
         library.record(LibraryEntry(
             title: inspection.displayTitle,
             titleId: inspection.titleId,
+            contentId: inspection.contentId,
             source: inspection.executable,
             output: output,
             target: settings.target,

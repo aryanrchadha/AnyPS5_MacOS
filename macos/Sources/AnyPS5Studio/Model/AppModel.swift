@@ -79,7 +79,6 @@ final class AppModel {
 
     let runner = ProcessRunner()
     let library = LibraryStore()
-    let compatibility = CompatibilityList.load()
     let controllers = ControllerMonitor()
     let build = BuildInfo.current
     private(set) var updateStatus: UpdateStatus?

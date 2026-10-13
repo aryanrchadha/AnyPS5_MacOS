@@ -119,10 +119,19 @@ private struct SourceCard: View {
                         Callout(text: publisher.summary, tint: Theme.accent, symbol: "building.2")
                             .padding(.top, 4)
                     }
-                    if let record = model.compatibility?.record(for: inspection.titleId) {
-                        Chip(text: record.summary, symbol: "checkmark.seal", tint: Theme.accent)
-                            .help("From docs/user/COMPATIBILITY.md")
+                    HStack(spacing: 14) {
+                        Link(destination: ProjectLinks.blockerMap) {
+                            Label("Blocker map", systemImage: "map")
+                        }
+                        .help("Per-game progress and open blockers, built from public GitHub data")
+                        Link(destination: ProjectLinks.gameBringUp) {
+                            Label("Report a test", systemImage: "bubble.left.and.text.bubble.right")
+                        }
+                        .help("Game bring-up discussions, one thread per title")
                     }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.top, 2)
                 }
                 Spacer(minLength: 0)
             }

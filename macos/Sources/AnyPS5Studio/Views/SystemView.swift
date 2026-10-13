@@ -280,7 +280,7 @@ private struct LimitsCard: View {
         ("Linux output",
          "Linux images need a Linux x86-64 host. Conversion works here; running them does not."),
         ("AAA and online titles",
-         "docs/user/COMPATIBILITY.md lists the titles verified so far. Titles that depend on online services, anti-cheat or runtime features that are not implemented yet are not expected to start."),
+         "The community blocker map tracks each title's progress and open blockers, and test reports go in the Game bring-up discussions; both are linked from the Convert page. Titles that depend on online services, anti-cheat or runtime features that are not implemented yet are not expected to start."),
     ]
 
     var body: some View {

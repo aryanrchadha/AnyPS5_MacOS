@@ -109,6 +109,10 @@ private struct SourceCard: View {
                         Chip(text: ByteCountFormatter.string(fromByteCount: inspection.byteCount, countStyle: .file),
                              symbol: "internaldrive")
                         Chip(text: "\(inspection.moduleCount) modules", symbol: "square.stack.3d.up")
+                        if let publisher = inspection.publisher {
+                            Chip(text: publisher.name, symbol: "building.2")
+                                .help(inspection.contentId ?? "")
+                        }
                     }
                     .padding(.top, 4)
                     if let record = model.compatibility?.record(for: inspection.titleId) {

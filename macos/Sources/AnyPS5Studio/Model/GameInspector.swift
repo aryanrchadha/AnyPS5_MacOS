@@ -41,9 +41,12 @@ struct GameInspection: Equatable {
     let moduleIssue: String?
     let title: String?
     let titleId: String?
+    var contentId: String? = nil
     let iconURL: URL?
 
     var root: URL { executable.deletingLastPathComponent() }
+
+    var publisher: Publisher? { contentId.flatMap(ContentID.init)?.publisher }
 
     var displayTitle: String { title ?? executable.deletingPathExtension().lastPathComponent }
 
@@ -81,7 +84,7 @@ enum GameInspector {
         let byteCount = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
 
         let (directories, issue) = moduleDirectories(in: root)
-        let (title, titleId) = readParamJson(root.appendingPathComponent("sce_sys/param.json"))
+        let param = ParamJson.read(besides: executable)
         let icon = root.appendingPathComponent("sce_sys/icon0.png")
 
         return GameInspection(
@@ -90,8 +93,9 @@ enum GameInspector {
             byteCount: byteCount,
             moduleDirectories: directories,
             moduleIssue: issue,
-            title: title,
-            titleId: titleId,
+            title: param.title,
+            titleId: param.titleId,
+            contentId: param.contentId,
             iconURL: FileManager.default.fileExists(atPath: icon.path) ? icon : nil
         )
     }
@@ -144,17 +148,5 @@ enum GameInspector {
             result.append(ModuleDirectory(name: name, elfCount: elfCount))
         }
         return (result, nil)
-    }
-
-    private static func readParamJson(_ url: URL) -> (String?, String?) {
-        guard let data = try? Data(contentsOf: url),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return (nil, nil) }
-        let titleId = root["titleId"] as? String
-        guard let localized = root["localizedParameters"] as? [String: Any] else { return (nil, titleId) }
-        let language = (localized["defaultLanguage"] as? String) ?? (root["defaultLanguage"] as? String)
-        let entry = (language.flatMap { localized[$0] } as? [String: Any])
-            ?? (localized["en-US"] as? [String: Any])
-            ?? localized.values.compactMap { $0 as? [String: Any] }.first
-        return (entry?["titleName"] as? String, titleId)
     }
 }

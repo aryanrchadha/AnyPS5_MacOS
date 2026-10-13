@@ -164,6 +164,10 @@ private struct LibraryCard: View {
                                  symbol: entry.succeeded ? "checkmark" : "xmark",
                                  tint: entry.succeeded ? Theme.success : Theme.failure)
                             Chip(text: entry.target.title, symbol: entry.target.symbol)
+                            if let publisher = entry.publisher {
+                                Chip(text: publisher.shortName, symbol: "building.2")
+                                    .help("\(publisher.name) \u{B7} \(entry.contentId ?? "")")
+                            }
                             if let status = entry.status {
                                 Chip(text: status.title, symbol: status.symbol, tint: status.tint)
                                     .help(status.detail)

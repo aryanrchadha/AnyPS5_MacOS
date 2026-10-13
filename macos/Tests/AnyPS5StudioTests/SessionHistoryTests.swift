@@ -42,4 +42,23 @@ final class SessionHistoryTests: XCTestCase {
         """)
         XCTAssertEqual(SessionHistory.csv(for: makeEntry("New")), SessionHistory.csvHeader + "\n")
     }
+
+    func testFrameRateChange() {
+        let uhd = FrameRateMeter.Size(width: 3840, height: 2160)
+        let qhd = FrameRateMeter.Size(width: 2560, height: 1440)
+        func session(_ average: Double?, _ size: FrameRateMeter.Size? = nil) -> PlaySession {
+            PlaySession(start: Date(timeIntervalSince1970: 0), duration: 60, exitCode: 0,
+                        averageFPS: average, lowestFPS: average.map { $0 - 10 }, frameSize: size)
+        }
+        XCTAssertNil(SessionHistory.frameRateChange(for: makeEntry("New")))
+        XCTAssertNil(SessionHistory.frameRateChange(for: makeEntry("One", sessions: [session(60, uhd), session(nil)])))
+        XCTAssertEqual(SessionHistory.frameRateChange(for: makeEntry("Up", sessions: [session(48.2, uhd), session(nil), session(60.4, uhd)])),
+                       "+12 fps from the previous measurement (48 fps)")
+        XCTAssertEqual(SessionHistory.frameRateChange(for: makeEntry("Down", sessions: [session(60, uhd), session(55, uhd)])),
+                       "\u{2212}5 fps from the previous measurement (60 fps)")
+        XCTAssertEqual(SessionHistory.frameRateChange(for: makeEntry("Same", sessions: [session(59.8), session(60.1)])),
+                       "Same average as the previous measurement (60 fps)")
+        XCTAssertEqual(SessionHistory.frameRateChange(for: makeEntry("Resized", sessions: [session(90, qhd), session(60, uhd)])),
+                       "\u{2212}30 fps from the previous measurement (90 fps), which ran at 2560 \u{D7} 1440 instead of 3840 \u{D7} 2160")
+    }
 }

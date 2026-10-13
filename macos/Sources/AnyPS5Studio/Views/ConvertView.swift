@@ -115,6 +115,10 @@ private struct SourceCard: View {
                         }
                     }
                     .padding(.top, 4)
+                    if let publisher = inspection.publisher {
+                        Callout(text: publisher.summary, tint: Theme.accent, symbol: "building.2")
+                            .padding(.top, 4)
+                    }
                     if let record = model.compatibility?.record(for: inspection.titleId) {
                         Chip(text: record.summary, symbol: "checkmark.seal", tint: Theme.accent)
                             .help("From docs/user/COMPATIBILITY.md")

@@ -227,6 +227,7 @@ struct SessionSummary: View {
     @Environment(AppModel.self) private var model
     let entry: LibraryEntry
     @State var crash: CrashSummary?
+    @State var displays: [DisplayTarget] = []
 
     var body: some View {
         let sessions = entry.sessions ?? []
@@ -269,6 +270,21 @@ struct SessionSummary: View {
                     .font(.captionText)
                     .foregroundStyle(FrameRateMeter.meetsTarget(average: average, size: measured.frameSize) ? Theme.success : Theme.textSecondary)
                     .help("Measured \(measured.start.formatted(date: .abbreviated, time: .shortened)) with \(FrameRateMeter.environmentKey); a lower bound")
+                if let advice = FrameRateMeter.refreshAdvice(average: average, displays: displays) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Label(advice, systemImage: "display")
+                            .font(.captionText)
+                            .foregroundStyle(Theme.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let display = FrameRateMeter.refreshCap(average: average, displays: displays),
+                           display.availableRefreshRate > display.maximumRefreshRate {
+                            Button("Open Displays") { model.openDisplaySettings() }
+                                .controlSize(.small)
+                                .fixedSize()
+                        }
+                    }
+                    .padding(.top, 2)
+                }
             }
             if let last = sessions.last, last.exitCode != 0 {
                 Text("The last session exited with code \(last.exitCode). Its log has the full output.")
@@ -322,7 +338,10 @@ struct SessionSummary: View {
                     .foregroundStyle(Theme.accent)
             }
         }
-        .task(id: sessions.count) { crash = model.lastCrash(for: entry) }
+        .task(id: sessions.count) {
+            crash = model.lastCrash(for: entry)
+            displays = DisplayProbe.displays()
+        }
     }
 
     static func text(for entry: LibraryEntry) -> String {

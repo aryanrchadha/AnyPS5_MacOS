@@ -73,6 +73,26 @@ struct FrameRateMeter {
         (size?.isUHD ?? false) && average >= targetRate * targetTolerance
     }
 
+    static let refreshTolerance = 0.04
+
+    static func refreshCap(average: Double, displays: [DisplayTarget]) -> DisplayTarget? {
+        guard average < targetRate * targetTolerance else { return nil }
+        return displays.first { display in
+            let rate = Double(display.maximumRefreshRate)
+            return rate > 0 && abs(average - rate) <= rate * refreshTolerance
+        }
+    }
+
+    static func refreshAdvice(average: Double, displays: [DisplayTarget]) -> String? {
+        guard let display = refreshCap(average: average, displays: displays) else { return nil }
+        let rate = display.maximumRefreshRate
+        let base = "The average matches the \(rate) Hz refresh rate of \(display.name). Frames are presented with vsync, so this display caps the frame rate at \(rate) FPS; the title may also pace itself at that rate."
+        guard display.availableRefreshRate > rate else {
+            return base + " A higher frame rate needs a display that refreshes at \(Int(targetRate)) Hz."
+        }
+        return base + " Choose \(display.availableRefreshRate) Hz under Refresh rate in System Settings \u{203A} Displays and measure again."
+    }
+
     private static func capture(_ pattern: String, in line: String) -> UInt64? {
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),

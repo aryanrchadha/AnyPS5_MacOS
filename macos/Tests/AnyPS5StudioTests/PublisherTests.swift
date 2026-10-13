@@ -69,5 +69,6 @@ final class PublisherTests: XCTestCase {
     func testNotes() {
         XCTAssertEqual(Publisher.electronicArts.notes.map(\.title), ["Online modes", "Rosters and live content", "Frame rate"])
         XCTAssertEqual(Publisher.electronicArts.shortName, "EA")
+        XCTAssertTrue(Publisher.electronicArts.summary.hasPrefix("Electronic Arts title. Online modes"))
     }
 }

@@ -35,6 +35,13 @@ enum Publisher: String, CaseIterable, Identifiable {
         }
     }
 
+    var summary: String {
+        switch self {
+        case .electronicArts:
+            "Electronic Arts title. Online modes such as Ultimate Team, online seasons and co-op are unavailable, and nothing in the runtime is specific to EA's engines. Its launch options explain what to expect once it is converted."
+        }
+    }
+
     var notes: [PublisherNote] {
         switch self {
         case .electronicArts:

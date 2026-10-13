@@ -1,0 +1,142 @@
+name: macOS
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'macos/**'
+      - 'core/relinker/**'
+      - 'CMakeLists.txt'
+      - 'docs/user/COMPATIBILITY.md'
+      - '.github/workflows/macos.yml'
+  pull_request:
+    paths:
+      - 'macos/**'
+      - 'core/relinker/**'
+      - 'CMakeLists.txt'
+      - 'docs/user/COMPATIBILITY.md'
+      - '.github/workflows/macos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple-silicon:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Relinker tests (arm64, native)
+        run: |
+          cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release -DANYPS5_RELINKER_ONLY=ON -DBUILD_TESTING=ON
+          cmake --build build-tests --parallel 2>&1 | tee build-tests.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E 'error:' build-tests.log | head -20 | while IFS= read -r line; do echo "::error title=Relinker build::$line"; done
+            exit "$status"
+          fi
+          ctest --test-dir build-tests --output-on-failure --timeout 120 2>&1 | tee ctest.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            for test in $(sed -n 's/^[0-9]*:\(.*\)$/\1/p' build-tests/Testing/Temporary/LastTestsFailed.log); do
+              detail=$(ctest --test-dir build-tests -R "^${test}\$" --output-on-failure 2>&1 | grep -vE '^(Test project|      Start|Total Test time|Errors while|Output from|Use \"--rerun)' | tail -25 | python3 -c "import sys; print(sys.stdin.read().replace('%', '%25').replace('\r', '').replace('\n', '%0A'))")
+              echo "::error title=ctest ${test}::${detail}"
+            done
+          fi
+          exit "$status"
+      - name: Studio model tests
+        if: always()
+        run: |
+          swift test --package-path macos 2>&1 | tee swift-test.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E 'error:|failed' swift-test.log | head -20 | while IFS= read -r line; do echo "::error title=Studio tests::$line"; done
+          fi
+          exit "$status"
+      - name: Build AnyPS5 Studio.app
+        if: always()
+        run: |
+          DMG=1 bash macos/scripts/build-app.sh 2>&1 | tee app.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            grep -E 'error:|warning: icon|failed' app.log | head -20 | while IFS= read -r line; do echo "::error title=App build::$line"; done
+          fi
+          exit "$status"
+      - name: Launch AnyPS5 Studio.app
+        timeout-minutes: 3
+        run: |
+          library="$HOME/Library/Application Support/AnyPS5 Studio"
+          mkdir -p "$library" /tmp/anyps5-fixture/Long /tmp/anyps5-fixture/Crash /tmp/anyps5-fixture/Linux /tmp/anyps5-fixture/Broken
+          cp macos/Tests/Fixtures/library.json "$library/library.json"
+          for output in Long/eboot.exe Crash/eboot.exe Linux/eboot.elf; do printf 'MZ' > "/tmp/anyps5-fixture/$output"; done
+          reports="$HOME/Library/Logs/DiagnosticReports"
+          before=$(ls "$reports" 2>/dev/null | grep -c '^AnyPS5Studio' || true)
+          "build-macos/AnyPS5 Studio.app/Contents/MacOS/AnyPS5Studio" > launch.log 2>&1 &
+          pid=$!
+          sleep 20
+          screencapture -x launch.png || true
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" && status=0 || status=$?
+            echo "::error title=App launch::AnyPS5 Studio exited with status $status within 20 seconds"
+            tail -40 launch.log
+            exit 1
+          fi
+          app="$PWD/build-macos/AnyPS5 Studio.app"
+          for page in convert library controls console system library/PPSA00001 library/NO-SUCH-TITLE; do
+            if ! open -a "$app" "anyps5://$page"; then
+              echo "::error title=App launch::open could not deliver anyps5://$page to AnyPS5 Studio"
+              kill "$pid"
+              exit 1
+            fi
+            sleep 3
+            screencapture -x "page-${page//\//-}.png" || true
+          done
+          shots=$(ls page-*.png 2>/dev/null | wc -l | tr -d ' ')
+          unique=$(for f in page-*.png; do [ -f "$f" ] && shasum "$f" | cut -d' ' -f1; done | sort -u | wc -l | tr -d ' ')
+          if [ "$shots" -eq 7 ] && [ "$unique" -lt 7 ]; then
+            echo "::error title=App launch::Only $unique of 7 page screenshots differ, so the page links did not all change the page"
+            kill "$pid"
+            exit 1
+          fi
+          if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" && status=0 || status=$?
+            echo "::error title=App launch::AnyPS5 Studio exited with status $status while showing its pages"
+            tail -40 launch.log
+            exit 1
+          fi
+          kill "$pid"
+          wait "$pid" 2>/dev/null || true
+          sleep 2
+          after=$(ls "$reports" 2>/dev/null | grep -c '^AnyPS5Studio' || true)
+          if [ "$after" -gt "$before" ]; then
+            echo "::error title=App launch::A crash report for AnyPS5 Studio was written"
+            ls -t "$reports" | grep '^AnyPS5Studio' | head -1 | while IFS= read -r report; do head -60 "$reports/$report"; done
+            exit 1
+          fi
+          echo "AnyPS5 Studio ran for 20 seconds and showed each page without exiting or crashing."
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: logs
+          path: |
+            build-tests.log
+            ctest.log
+            swift-test.log
+            app.log
+            launch.log
+            launch.png
+            page-*.png
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: AnyPS5-Studio-macOS-arm64
+          path: build-macos/AnyPS5-Studio.dmg
+          if-no-files-found: error

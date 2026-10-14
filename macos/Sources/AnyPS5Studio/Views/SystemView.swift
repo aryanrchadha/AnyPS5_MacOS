@@ -7,7 +7,7 @@ struct SystemView: View {
     var body: some View {
         Page(eyebrow: "System",
              title: "What this Mac can do",
-             subtitle: "The relinker runs natively on Apple Silicon. Converted titles are x86-64 Windows or Linux programs, so on a Mac they run through Rosetta 2 inside a Wine-based runtime.") {
+             subtitle: "The relinker runs natively on Apple Silicon. Converted titles are x86-64 programs, so on a Mac they run through Rosetta 2, inside Wine for Windows output or directly for experimental macOS output.") {
             VStack(spacing: 20) {
                 WeightedRow(weights: [1, 1]) {
                     ReadinessCard().reveal(0.05)
@@ -271,8 +271,8 @@ private struct DisplayCard: View {
 
 private struct LimitsCard: View {
     private let limits: [(String, String)] = [
-        ("No native macOS output yet",
-         "The relinker writes Linux ELF and Windows PE images. A Mach-O writer and macOS builds of the system libraries do not exist yet, so titles cannot run without Wine."),
+        ("macOS output is experimental",
+         "The relinker writes x86-64 Mach-O that runs under Rosetta 2 without Wine, but the project does not release macOS system libraries and its macOS runtime is incomplete. Build the libraries on a Mac to try it."),
         ("Wine path is unverified",
          "Launching Windows output through Wine on Apple Silicon has not been tested by the project. Expect failures in memory reservation, threading and Vulkan feature coverage."),
         ("Direct memory",

@@ -230,7 +230,8 @@ private struct LibraryCard: View {
                         TitleDataButton(entry: entry)
                     }
                     Spacer(minLength: 0)
-                    if entry.target == .windows && entry.succeeded && entry.outputExists && !model.system.wineRuntimes.isEmpty {
+                    if entry.target.runsOnMac && entry.succeeded && entry.outputExists
+                        && (entry.target == .macos || !model.system.wineRuntimes.isEmpty) {
                         IslandButton(title: "Launch", symbol: "play.fill", enabled: !model.runner.state.isRunning) {
                             model.launch(entry)
                         }
@@ -261,13 +262,13 @@ private struct LibraryCard: View {
             }
             Button("Copy Compatibility Report") { model.copyCompatibilityReport(for: entry) }
             Button("Copy Launch Link") { model.copyLaunchLink(for: entry) }
-                .disabled(entry.target != .windows || !entry.succeeded)
+                .disabled(!entry.target.runsOnMac || !entry.succeeded)
             Button("Copy Library Link") { model.copyLibraryLink(for: entry) }
             Button(model.isFavorite(entry) ? "Unpin" : "Pin to Top") { model.toggleFavorite(entry) }
             Button("Open Last Session Log") { model.openLastSessionLog(for: entry) }
                 .disabled(entry.lastSession == nil)
             Button("Launch with Wine Errors") { model.launch(entry, diagnostic: true) }
-                .disabled(!model.launchableEntries.contains { $0.id == entry.id } || model.runner.state.isRunning)
+                .disabled(entry.target != .windows || !model.launchableEntries.contains { $0.id == entry.id } || model.runner.state.isRunning)
             Button("Export Diagnostics…") { model.exportDiagnostics(for: entry) }
             Button("Export Sessions…") { model.exportSessions(for: entry) }
                 .disabled(entry.sessions?.isEmpty != false)

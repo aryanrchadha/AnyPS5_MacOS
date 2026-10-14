@@ -12,6 +12,7 @@ struct LaunchOptionsPanel: View {
 
     var body: some View {
         let entry = model.library.entry(for: output)
+        let usesWine = entry?.target != .macos
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Eyebrow(text: "Launch options", tint: Theme.accent)
@@ -31,8 +32,10 @@ struct LaunchOptionsPanel: View {
                     PublisherNotesView(publisher: publisher, measuring: $profile.measureFrameRate)
                     Hairline()
                 }
-                RuntimeRow(selection: $profile.wineRuntimePath)
-                Hairline()
+                if usesWine {
+                    RuntimeRow(selection: $profile.wineRuntimePath)
+                    Hairline()
+                }
                 OptionRow(title: "Metal Performance HUD",
                           detail: "Overlay with frame rate, frame time and GPU memory, drawn by macOS for Metal apps.",
                           flag: "MTL_HUD_ENABLED=1",
@@ -48,16 +51,18 @@ struct LaunchOptionsPanel: View {
                           flag: "ANYPS5_NO_SHADER_CACHE=1",
                           isOn: $profile.disableShaderCache)
                 Hairline()
-                OptionRow(title: "Quiet Wine logging",
-                          detail: "Turn off Wine's own debug channels to cut console noise. Runtime output still appears; Wine errors do not.",
-                          flag: "WINEDEBUG=-all",
-                          isOn: $profile.quietWine)
-                Hairline()
-                OptionRow(title: "Separate Wine prefix",
-                          detail: "Give this title its own Wine prefix in \(WinePrefix.folderName) beside the executable, so DLLs installed for it with winetricks do not change other titles. The first launch takes longer while Wine creates it.",
-                          flag: "WINEPREFIX=\u{2026}/\(WinePrefix.folderName)",
-                          isOn: $profile.separatePrefix)
-                Hairline()
+                if usesWine {
+                    OptionRow(title: "Quiet Wine logging",
+                              detail: "Turn off Wine's own debug channels to cut console noise. Runtime output still appears; Wine errors do not.",
+                              flag: "WINEDEBUG=-all",
+                              isOn: $profile.quietWine)
+                    Hairline()
+                    OptionRow(title: "Separate Wine prefix",
+                              detail: "Give this title its own Wine prefix in \(WinePrefix.folderName) beside the executable, so DLLs installed for it with winetricks do not change other titles. The first launch takes longer while Wine creates it.",
+                              flag: "WINEPREFIX=\u{2026}/\(WinePrefix.folderName)",
+                              isOn: $profile.separatePrefix)
+                    Hairline()
+                }
                 OptionRow(title: "Back up saves on launch",
                           detail: "Archive the save folder to the Save backups folder in Settings before each launch. The newest \(SaveData.automaticRetention) automatic backups are kept.",
                           flag: "\(SaveData.folderName) → \(SaveData.backupRoot.lastPathComponent)",
@@ -74,7 +79,8 @@ struct LaunchOptionsPanel: View {
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.black.opacity(0.35)))
                         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline, lineWidth: 1))
-                    Text("KEY=value per line, applied over the Wine environment in Settings.")
+                    Text(usesWine ? "KEY=value per line, applied over the Wine environment in Settings."
+                                  : "KEY=value per line, passed to the title when it starts.")
                         .font(.captionText)
                         .foregroundStyle(Theme.textTertiary)
                 }
@@ -96,7 +102,7 @@ struct LaunchOptionsPanel: View {
                     .disabled(cache.files == 0)
                     .opacity(cache.files == 0 ? 0.4 : 1)
                 }
-                if profile.separatePrefix || prefix != nil {
+                if usesWine && (profile.separatePrefix || prefix != nil) {
                     Hairline()
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
@@ -361,7 +367,7 @@ struct SessionSummary: View {
                     }
                     .padding(.top, 2)
                 }
-                if let crash {
+                if let crash, entry.target == .windows {
                     ForEach(Array(Set(crash.findings.compactMap(\.winetricksVerb))).sorted(), id: \.self) { verb in
                         Button("Copy winetricks \(verb) command") { model.copyWinetricksCommand(for: entry, verb: verb) }
                             .buttonStyle(.plain)
@@ -370,11 +376,13 @@ struct SessionSummary: View {
                             .help(model.winetricksCommand(for: entry, verb: verb))
                     }
                 }
-                Button("Launch again with Wine errors") { model.launch(entry, diagnostic: true) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Theme.accent)
-                    .disabled(model.runner.state.isRunning)
+                if entry.target == .windows {
+                    Button("Launch again with Wine errors") { model.launch(entry, diagnostic: true) }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.accent)
+                        .disabled(model.runner.state.isRunning)
+                }
             }
             if !sessions.isEmpty {
                 Button("Open last session log") { model.openLastSessionLog(for: entry) }

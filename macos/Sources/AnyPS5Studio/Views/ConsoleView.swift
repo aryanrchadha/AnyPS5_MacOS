@@ -255,6 +255,17 @@ private struct FlowButtons: View {
                             .disabled(model.layout?.executableExists != true)
                             .opacity(model.layout?.executableExists == true ? 1 : 0.4)
                     }
+                } else if model.settings.target == .macos {
+                    IslandButton(title: "Launch", symbol: "play.fill",
+                                 enabled: model.layout?.isComplete == true && !model.runner.state.isRunning) {
+                        model.launch()
+                    }
+                    if let output = model.outputExecutable, model.library.entry(for: output) != nil {
+                        LaunchOptionsButton(output: output)
+                    }
+                    Text("Runs natively under Rosetta 2 once macOS system libraries are in libs/.")
+                        .font(.captionText)
+                        .foregroundStyle(Theme.textTertiary)
                 } else {
                     Text("Linux builds run on a Linux x86-64 host.")
                         .font(.captionText)

@@ -32,6 +32,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Relinker tests (arm64, native)
+        timeout-minutes: 20
         run: |
           cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release -DANYPS5_RELINKER_ONLY=ON -DBUILD_TESTING=ON
           cmake --build build-tests --parallel 2>&1 | tee build-tests.log
@@ -40,7 +41,7 @@ jobs:
             grep -E 'error:' build-tests.log | head -20 | while IFS= read -r line; do echo "::error title=Relinker build::$line"; done
             exit "$status"
           fi
-          ctest --test-dir build-tests --output-on-failure --timeout 120 2>&1 | tee ctest.log
+          ctest --test-dir build-tests --output-on-failure --timeout 120 --parallel 3 2>&1 | tee ctest.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             for test in $(sed -n 's/^[0-9]*:\(.*\)$/\1/p' build-tests/Testing/Temporary/LastTestsFailed.log); do

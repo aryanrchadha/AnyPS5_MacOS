@@ -35,7 +35,7 @@ jobs:
         timeout-minutes: 20
         run: |
           cmake -S . -B build-tests -DCMAKE_BUILD_TYPE=Release -DANYPS5_RELINKER_ONLY=ON -DBUILD_TESTING=ON
-          cmake --build build-tests --parallel 2>&1 | tee build-tests.log
+          cmake --build build-tests --parallel "$(sysctl -n hw.ncpu)" 2>&1 | tee build-tests.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             grep -E 'error:' build-tests.log | head -20 | while IFS= read -r line; do echo "::error title=Relinker build::$line"; done

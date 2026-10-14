@@ -24,7 +24,7 @@ cmake -S "$ROOT" -B "$BUILD/relinker" ${generator[@]+"${generator[@]}"} \
     -DANYPS5_RELINKER_ONLY=ON \
     -DCMAKE_OSX_ARCHITECTURES="${ARCHS// /;}" \
     -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0
-cmake --build "$BUILD/relinker" --target relinker --parallel
+cmake --build "$BUILD/relinker" --target relinker --parallel "$(sysctl -n hw.ncpu)"
 
 step "AnyPS5 Studio (${ARCHS})"
 swift_arch=()

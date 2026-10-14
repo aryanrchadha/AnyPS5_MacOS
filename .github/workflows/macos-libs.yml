@@ -1,0 +1,63 @@
+name: macOS system libraries
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  x86_64:
+    runs-on: macos-15-intel
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Toolchain
+        run: |
+          brew list ninja >/dev/null 2>&1 || brew install ninja
+          sw_vers
+          clang++ --version
+          cmake --version
+          sysctl -n hw.ncpu hw.memsize
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANYPS5_RELINKER_ONLY=OFF \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 2>&1 | tee configure.log
+      - name: Build libraries
+        timeout-minutes: 70
+        run: |
+          set -o pipefail
+          cmake --build build --target libs --parallel "$(sysctl -n hw.ncpu)" -- -k 0 2>&1 | tee libs.log
+      - name: Summarise failures
+        if: always()
+        run: |
+          if [ -f libs.log ]; then
+            {
+              echo "### Compile errors by file"
+              echo
+              echo '```'
+              grep -E "error:" libs.log | sed -E "s#^$PWD/##; s#:[0-9]+:[0-9]+: (fatal )?error:.*##" | sort | uniq -c | sort -nr || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          ls -la build/core/libs/libs 2>/dev/null || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: macos-libs-logs
+          path: |
+            configure.log
+            libs.log
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v7
+        if: success()
+        with:
+          name: macos-libs-x86_64
+          path: build/core/libs/libs
+          if-no-files-found: error

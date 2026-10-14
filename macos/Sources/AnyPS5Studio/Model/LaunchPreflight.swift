@@ -107,7 +107,7 @@ struct LaunchPreflight: Equatable {
                 id: "libraries", title: "macOS system libraries",
                 level: found ? .ok : .failure,
                 detail: found ? "\(Self.nativeKernel) in \(libraries.lastPathComponent)/"
-                              : "\(kernel.path) is missing. The output needs AnyPS5's system libraries built on a Mac; the project does not release them."))
+                              : "\(kernel.path) is missing. The output needs AnyPS5's system libraries built on a Mac, and they do not build on macOS yet."))
         } else {
             checks.append(PreflightCheck(
                 id: "libraries", title: "macOS system libraries", level: .warning,

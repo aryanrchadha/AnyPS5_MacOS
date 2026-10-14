@@ -144,7 +144,7 @@ final class NativeLaunchPreflightTests: XCTestCase {
                                     needsRosetta: true, freeBytes: nil)
         XCTAssertFalse(check.canLaunch)
         XCTAssertEqual(check.failures.map(\.id), ["libraries", "rosetta"])
-        XCTAssertTrue(check.failures[0].detail.contains("does not release them"))
+        XCTAssertTrue(check.failures[0].detail.contains("do not build on macOS yet"))
         XCTAssertFalse(check.checks.contains { $0.title == "Wine runtime" })
     }
 

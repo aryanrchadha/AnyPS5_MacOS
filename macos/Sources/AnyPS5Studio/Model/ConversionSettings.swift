@@ -43,7 +43,7 @@ enum TargetPlatform: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .windows: "Runs on this Mac through Wine, CrossOver or Whisky. Experimental."
         case .linux: "Runs on a Linux x86-64 machine or VM. Cannot start natively on macOS."
-        case .macos: "Runs on this Mac under Rosetta 2 without Wine. Needs system libraries built for macOS. Experimental."
+        case .macos: "Runs on this Mac under Rosetta 2 without Wine, once AnyPS5's system libraries build for macOS; they do not yet. Experimental."
         }
     }
 

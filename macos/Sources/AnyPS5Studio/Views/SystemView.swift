@@ -272,7 +272,7 @@ private struct DisplayCard: View {
 private struct LimitsCard: View {
     private let limits: [(String, String)] = [
         ("macOS output is experimental",
-         "The relinker writes x86-64 Mach-O that runs under Rosetta 2 without Wine, but the project does not release macOS system libraries and its macOS runtime is incomplete. Build the libraries on a Mac to try it."),
+         "The relinker writes x86-64 Mach-O for Rosetta 2 without Wine, but AnyPS5's system libraries do not build on macOS yet: they still use Linux-only interfaces. Until they do, macOS output cannot run."),
         ("Wine path is unverified",
          "Launching Windows output through Wine on Apple Silicon has not been tested by the project. Expect failures in memory reservation, threading and Vulkan feature coverage."),
         ("Direct memory",

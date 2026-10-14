@@ -10,7 +10,7 @@ AnyPS5 Studio is a native SwiftUI front end for the [relinker](USAGE.md). It run
 | Windows PE output                      | Written on the Mac. Running it needs Wine (CrossOver, Whisky or Homebrew Wine). |
 | Linux ELF output                       | Written on the Mac. Running it needs a Linux x86-64 host.                       |
 | System libraries (`libs/*.prx`)        | Built on a host of the target OS. The project releases Windows and Linux builds only. |
-| Native macOS (Mach-O) output           | Written on the Mac. Runs under Rosetta 2 without Wine once macOS system libraries are in `libs/`. Experimental; see [macOS output](#macos-output). |
+| Native macOS (Mach-O) output           | Written on the Mac. Cannot run yet: the system libraries it needs do not build on macOS. See [macOS output](#macos-output). |
 
 Converted titles are x86-64 programs. On Apple Silicon they execute through Rosetta 2, which implements Intel's instruction set, so keep `--to-intel` enabled (the app's default). Rosetta translates AVX2 from macOS 15 onward; PS5 code uses AVX2, so earlier macOS releases will fault on it.
 
@@ -30,7 +30,13 @@ Measure rather than assume: enable the Metal Performance HUD for the title and r
 
 The *macOS Mach-O* target runs `relinker --macos`, with `--to-rosetta` in place of `--to-intel` while *AMD → Intel and Rosetta lowering* is on. The result is an x86-64 Mach-O executable without a file extension, with the title's modules as Mach-O libraries in `app0/sce_module`, that Apple Silicon runs through Rosetta 2 and that needs no Wine. `--to-rosetta` also lowers instructions Rosetta lacks: RDSEED to RDRAND, CLWB to a no-op, and RDPID to processor 0.
 
-The executable loads `libkernel.prx` and the other system libraries from its library search path, `libs/` beside it by default. Those must be AnyPS5's system libraries built on a Mac for x86-64, which the project does not release; building them needs `-DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64` and the submodules, and parts of the macOS runtime, such as its memory paths, are not in the tree yet ([libc debt](../dev/debt/libc.md)). AnyPS5 Studio has not run a game this way.
+The executable loads `libkernel.prx` and the other system libraries from its library search path, `libs/` beside it by default. Those must be AnyPS5's system libraries built on a Mac for x86-64, and they do not build there yet. A full build (`-DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64`, with submodules) on an Intel macOS 15 runner in October 2026 configured, then stopped in libc, libkernel and other libraries:
+
+- they use Linux interfaces macOS lacks: `link.h` and `dl_iterate_phdr`, `eventfd`, `memfd_create`, `ppoll`, `pthread_getattr_np`, `sched_getcpu`, `RUSAGE_THREAD` and Linux signal contexts (`gregs`, `REG_RIP`);
+- they use `std::stop_token` and `std::stop_source`, which Apple's libc++ does not provide by default;
+- parts of the macOS runtime, such as its memory paths, are not in the tree ([libc debt](../dev/debt/libc.md)).
+
+The *macOS system libraries* workflow (`.github/workflows/macos-libs.yml`, started by hand from the Actions tab) repeats that build, lists the compile errors per file in its summary, and uploads the libraries once they build. Until then, macOS output can be written and inspected but not run, and AnyPS5 Studio has not run a game this way.
 
 Launch runs the executable directly from its folder, after marking it executable, with the title's launch options as its environment. The pre-launch check fails when `libkernel.prx` is not in `libs/` or Rosetta 2 is missing, and only warns when the search path points outside the output folder. Wine options, winetricks commands, *Launch with Wine Errors* and *Add to Applications* apply to Windows output only.
 

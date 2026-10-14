@@ -723,7 +723,7 @@ final class AppModel {
         let panel = NSOpenPanel()
         panel.title = "Choose the folder with \(platform) system libraries (*.prx)"
         panel.message = settings.target == .macos
-            ? "Built on a Mac with -DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 and `cmake --build build --target libs`: build/core/libs/libs. The project does not release macOS libraries."
+            ? "Built on a Mac with -DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 and `cmake --build build --target libs`: build/core/libs/libs. As of October 2026 they do not build on macOS."
             : "Built with `cmake --build build --target libs` on a \(platform) host: build/core/libs/libs"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true

@@ -1,13 +1,6 @@
 name: macOS system libraries
 
 on:
-  push:
-    branches: ['claude/**']
-    paths:
-      - '.github/workflows/macos-libs.yml'
-  pull_request:
-    paths:
-      - '.github/workflows/macos-libs.yml'
   workflow_dispatch:
 
 permissions:
@@ -45,7 +38,13 @@ jobs:
         if: always()
         run: |
           if [ -f libs.log ]; then
-            grep -E "error:|FAILED:" libs.log | sort | uniq -c | sort -nr | head -80 || true
+            {
+              echo "### Compile errors by file"
+              echo
+              echo '```'
+              grep -E "error:" libs.log | sed -E "s#^$PWD/##; s#:[0-9]+:[0-9]+: (fatal )?error:.*##" | sort | uniq -c | sort -nr || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
           ls -la build/core/libs/libs 2>/dev/null || true
       - uses: actions/upload-artifact@v7

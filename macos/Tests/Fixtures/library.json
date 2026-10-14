@@ -1,0 +1,81 @@
+[
+  {
+    "contentId": "UP0006-PPSA00001_00-SAMPLE0000000000",
+    "convertedAt": "2026-09-21T14:13:20Z",
+    "exitCode": 0,
+    "id": "8864FCC3-907E-45C6-8359-FAC4D5EE457F",
+    "notes": "Runs at 60 fps after the first shader compile; audio crackles in menus.",
+    "output": "file:///tmp/anyps5-fixture/Long/eboot.exe",
+    "relinkerCommit": "0123456789abcdef",
+    "sessions": [
+      {
+        "duration": 3600,
+        "exitCode": 0,
+        "start": "2026-09-22T14:13:20Z"
+      },
+      {
+        "averageFPS": 58.4,
+        "duration": 5400,
+        "exitCode": 0,
+        "frameSize": {
+          "height": 2160,
+          "width": 3840
+        },
+        "lowestFPS": 41,
+        "start": "2026-09-23T14:13:20Z"
+      }
+    ],
+    "source": "file:///tmp/anyps5-fixture/sources/long",
+    "status": "playable",
+    "target": "windows",
+    "title": "Sample Title With A Deliberately Long Name To Test Wrapping",
+    "titleId": "PPSA00001"
+  },
+  {
+    "convertedAt": "2026-09-24T14:13:20Z",
+    "exitCode": 0,
+    "id": "07A17050-0224-4EB1-B3E7-E0BBAC23FE1B",
+    "output": "file:///tmp/anyps5-fixture/Crash/eboot.exe",
+    "sessions": [
+      {
+        "duration": 12,
+        "exitCode": 3,
+        "start": "2026-09-25T14:13:20Z"
+      }
+    ],
+    "source": "file:///tmp/anyps5-fixture/sources/crash",
+    "status": "boots",
+    "target": "windows",
+    "title": "Crashes On Boot",
+    "titleId": "PPSA00002"
+  },
+  {
+    "convertedAt": "2026-09-26T14:13:20Z",
+    "exitCode": 0,
+    "id": "D3909A4B-E121-4D70-AC35-2822058655B3",
+    "output": "file:///tmp/anyps5-fixture/Linux/eboot.elf",
+    "source": "file:///tmp/anyps5-fixture/sources/linux",
+    "target": "linux",
+    "title": "Linux Build",
+    "titleId": "PPSA00003"
+  },
+  {
+    "convertedAt": "2026-09-27T14:13:20Z",
+    "exitCode": 2,
+    "id": "3F28C5BD-8966-4E10-A69C-07ECF124AAAC",
+    "output": "file:///tmp/anyps5-fixture/Broken/eboot.exe",
+    "source": "file:///tmp/anyps5-fixture/sources/broken",
+    "target": "windows",
+    "title": "Failed Conversion",
+    "titleId": "PPSA00004"
+  },
+  {
+    "convertedAt": "2026-09-28T14:13:20Z",
+    "exitCode": 0,
+    "id": "18F5EF9A-5F28-4594-A302-6ACC2A329E47",
+    "output": "file:///tmp/anyps5-fixture/Moved/eboot.exe",
+    "source": "file:///tmp/anyps5-fixture/sources/moved",
+    "target": "windows",
+    "title": "Output Folder Moved"
+  }
+]

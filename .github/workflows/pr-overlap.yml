@@ -31,6 +31,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          shopt -s nullglob
           out=$RUNNER_TEMP/overlap
           state=$RUNNER_TEMP/overlap-state.json
           python3 tools/pr_overlap.py --base "${{ github.event.repository.default_branch }}" --out "$out"

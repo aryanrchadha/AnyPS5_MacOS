@@ -50,8 +50,23 @@ jobs:
             done
           fi
           exit "$status"
+      - name: Relinker test leftovers
+        if: always()
+        run: |
+          ps -axo pid,ppid,pcpu,rss,etime,command | sort -k3 -nr | head -15
+          pkill -9 -f "$PWD/build-tests" || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: relinker-tests
+          path: |
+            build-tests.log
+            ctest.log
+            build-tests/Testing/Temporary/LastTest.log
+          if-no-files-found: ignore
       - name: Studio model tests
         if: always()
+        timeout-minutes: 15
         run: |
           swift test --package-path macos 2>&1 | tee swift-test.log
           status=${PIPESTATUS[0]}

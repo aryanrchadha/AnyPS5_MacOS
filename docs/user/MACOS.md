@@ -9,8 +9,8 @@ AnyPS5 Studio is a native SwiftUI front end for the [relinker](USAGE.md). It run
 | Converting `eboot.bin` and its modules | Native. The relinker builds and runs as an arm64 binary.                        |
 | Windows PE output                      | Written on the Mac. Running it needs Wine (CrossOver, Whisky or Homebrew Wine). |
 | Linux ELF output                       | Written on the Mac. Running it needs a Linux x86-64 host.                       |
-| System libraries (`libs/*.prx`)        | Not buildable on macOS. Build them on a Windows or Linux host for that target.  |
-| Native macOS (Mach-O) output           | Not implemented.                                                                |
+| System libraries (`libs/*.prx`)        | Built on a host of the target OS. The project releases Windows and Linux builds only. |
+| Native macOS (Mach-O) output           | Written on the Mac. Runs under Rosetta 2 without Wine once macOS system libraries are in `libs/`. Experimental; see [macOS output](#macos-output). |
 
 Converted titles are x86-64 programs. On Apple Silicon they execute through Rosetta 2, which implements Intel's instruction set, so keep `--to-intel` enabled (the app's default). Rosetta translates AVX2 from macOS 15 onward; PS5 code uses AVX2, so earlier macOS releases will fault on it.
 
@@ -25,6 +25,14 @@ The System page's checks include *Performance*, which turns yellow while Low Pow
 - Whether a title starts at all depends on the system library coverage it needs. The community [blocker map](https://alxcbtw.github.io/anyps5-roadmap/) tracks per-title progress and open blockers.
 
 Measure rather than assume: enable the Metal Performance HUD for the title and read the frame rate and frame time during play, or turn on *Measure frame rate* in its launch options to have each session's average and lowest frame rate and output size recorded in the Library. The launch options compare the last measurement with the one before it, so you can see whether a change helped, and say when the two ran at different output sizes. When the average matches a connected display's refresh rate, the launch options note that vsync is capping it there (the title may also pace itself at that rate) and, if the display offers a faster mode, open the Displays settings to choose it.
+
+## macOS output
+
+The *macOS Mach-O* target runs `relinker --macos`, with `--to-rosetta` in place of `--to-intel` while *AMD → Intel and Rosetta lowering* is on. The result is an x86-64 Mach-O executable without a file extension, with the title's modules as Mach-O libraries in `app0/sce_module`, that Apple Silicon runs through Rosetta 2 and that needs no Wine. `--to-rosetta` also lowers instructions Rosetta lacks: RDSEED to RDRAND, CLWB to a no-op, and RDPID to processor 0.
+
+The executable loads `libkernel.prx` and the other system libraries from its library search path, `libs/` beside it by default. Those must be AnyPS5's system libraries built on a Mac for x86-64, which the project does not release; building them needs `-DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64` and the submodules, and parts of the macOS runtime, such as its memory paths, are not in the tree yet ([libc debt](../dev/debt/libc.md)). AnyPS5 Studio has not run a game this way.
+
+Launch runs the executable directly from its folder, after marking it executable, with the title's launch options as its environment. The pre-launch check fails when `libkernel.prx` is not in `libs/` or Rosetta 2 is missing, and only warns when the search path points outside the output folder. Wine options, winetricks commands, *Launch with Wine Errors* and *Add to Applications* apply to Windows output only.
 
 ## EA titles
 
@@ -46,7 +54,7 @@ bash macos/scripts/build-app.sh
 
 The script builds the relinker with `-DANYPS5_RELINKER_ONLY=ON`, builds the app with SwiftPM, assembles `build-macos/AnyPS5 Studio.app` with the relinker inside `Contents/MacOS/`, and signs both ad hoc.
 
-`swift test --package-path macos` runs the app's model tests: launch profiles, launchers (run with a stand-in Wine), save backups, session logs, the Library store, links, storage cleanup and reports. They need Xcode, because the Command Line Tools may not include XCTest, and they run in CI on every change under `macos/`. CI also starts the built app on an Apple Silicon runner with the sample Library in `macos/Tests/Fixtures/library.json` (five titles covering a long name, a failed session, a Linux build, a failed conversion and a missing output folder), waits 20 seconds, opens each page through its `anyps5://` link and the Library filtered to one title and to a title that does not exist, and fails if the app exits or leaves a crash report; its output and a screenshot of the launch and of each page are in the `logs` artifact.
+`swift test --package-path macos` runs the app's model tests: launch profiles, launchers (run with a stand-in Wine), save backups, session logs, the Library store, links, storage cleanup and reports. They need Xcode, because the Command Line Tools may not include XCTest, and they run in CI on every change under `macos/`. CI also starts the built app on an Apple Silicon runner with the sample Library in `macos/Tests/Fixtures/library.json` (six titles covering a long name, a failed session, a Linux build, a failed conversion, a missing output folder and a macOS build), waits 20 seconds, opens each page through its `anyps5://` link and the Library filtered to one title and to a title that does not exist, and fails if the app exits or leaves a crash report; its output and a screenshot of the launch and of each page are in the `logs` artifact.
 
 | Variable              | Effect                                              |
 |-----------------------|-----------------------------------------------------|
@@ -65,14 +73,14 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
    - checks the ELF magic;
    - applies the relinker's module folder rules (`sce_module` or `sce_modules`, optionally `prx`).
 
-   Choose Windows or Linux output, adjust the switches, and press Convert (⌘↩). The exact command is shown and can be copied. Switches are remembered between launches.
+   Choose Windows, Linux or macOS output, adjust the switches, and press Convert (⌘↩). The exact command is shown and can be copied. Switches are remembered between launches.
 2. **Queue.** When several games are opened, the extra ones wait in a queue. Convert All (⇧⌘↩) converts the current title, then each queued title with the same switches. Titles that cannot be converted are skipped.
-3. **Library.** Every conversion is recorded with its output, target and exit code. Cards reopen a title with its previous target and output folder, reveal it in Finder, or launch Windows output.
+3. **Library.** Every conversion is recorded with its output, target and exit code. Cards reopen a title with its previous target and output folder, reveal it in Finder, or launch Windows or macOS output.
 4. **Console.** Relinker output streams live and can be filtered by text or limited to warnings and errors. It can be copied or saved to a file. Exit code `0` is success, `1` rejected arguments, `2` a failed conversion.
 5. **Runtime layout.** Each title is written to `<output folder>/<name>/`.
-   - *Import libraries* copies `*.prx` files built on a Windows or Linux host into `libs/`.
+   - *Import libraries* copies `*.prx` files built on a host of the target OS into `libs/`.
    - *Link game files* symlinks the game's resources into `app0/` without copying. Module folders are skipped, because the relinker writes converted modules there.
-6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,).
+6. **Launch.** For Windows output with a Wine runtime installed, Launch runs the executable with the selected runtime from its own folder. The environment passed to Wine is edited in Settings (⌘,). macOS output is started directly; see [macOS output](#macos-output).
 
    Every launch from Studio, the menu bar or a link is checked first. A missing executable, a missing or non-executable Wine runtime, Rosetta 2 not installed on Apple Silicon, or a read-only output folder stops the launch and the banner says why. A pinned runtime that is no longer installed, less than 2 GB free on the output volume, a display set below 120 Hz that offers a 120 Hz or faster mode, Low Power Mode, or a Mac that macOS reports as seriously or critically hot (and therefore throttled), is noted in the Console and the launch goes ahead. The Options panel shows the same checks at the top.
 
@@ -117,7 +125,7 @@ The app is signed ad hoc, not notarized. A copy downloaded from the internet is 
 13. **Project updates.** `build-app.sh` records the commit and GitHub repository of each build. The System page compares that commit with `boykopovar:main`, where the relinker and runtime are developed, and lists the newer upstream commits. Each conversion remembers the relinker build that produced it. Titles converted with an older build are marked *Older relinker*, and *Re-convert outdated* queues them for Convert All.
 14. **Menu bar.** A game controller icon in the menu bar lists launchable titles, shows conversion progress, and reopens the window. *Continue* at the top relaunches the most recently played title; *Launch Last Played* (⇧⌘L) in the Conversion menu does the same.
 15. **Links.** AnyPS5 Studio handles `anyps5://` links, so Shortcuts (*Open URLs*), Raycast, Alfred or a terminal (`open 'anyps5://launch?title=PPSA02929'`) can start a title:
-    - `anyps5://launch?title=<title ID or title>` or `anyps5://launch/<title ID>` launches a converted Windows title. Title IDs are matched first, then titles, ignoring case; if several conversions match, the most recently used one wins.
+    - `anyps5://launch?title=<title ID or title>` or `anyps5://launch/<title ID>` launches a converted Windows or macOS title. Title IDs are matched first, then titles, ignoring case; if several conversions match, the most recently used one wins.
     - `anyps5://convert`, `anyps5://library`, `anyps5://controls`, `anyps5://console` and `anyps5://system` open that page.
     - `anyps5://library/<title ID>` or `anyps5://library?title=<title ID or title>` opens the Library filtered to that title. *Copy Library Link* in a Library card's context menu copies one.
 

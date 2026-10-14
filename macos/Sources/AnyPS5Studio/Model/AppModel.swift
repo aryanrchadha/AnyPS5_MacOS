@@ -118,10 +118,7 @@ final class AppModel {
     func outputExecutable(for inspection: GameInspection, name: String) -> URL? {
         guard let directory = outputDirectory else { return nil }
         let resolved = name.isEmpty ? inspection.suggestedOutputName : name
-        return directory
-            .appendingPathComponent(resolved, isDirectory: true)
-            .appendingPathComponent(resolved)
-            .appendingPathExtension(settings.target.fileExtension)
+        return settings.target.executable(in: directory.appendingPathComponent(resolved, isDirectory: true), name: resolved)
     }
 
     var commandArguments: [String]? {
@@ -153,6 +150,14 @@ final class AppModel {
         guard let rate = frameMeter.ingest(text, at: Date()) else { return }
         liveFrameRate = rate
         runner.note("Frame rate: \(Int(rate.rounded())) fps over the last report" + (frameMeter.size.map { " at \($0.text)" } ?? ""))
+    }
+
+    func nativeLaunchEnvironment(for output: URL) -> [String: String] {
+        (library.entry(for: output)?.launchProfile ?? LaunchProfile()).merged(over: [:])
+    }
+
+    func hasLaunchRuntime(_ entry: LibraryEntry) -> Bool {
+        entry.target == .macos || wineRuntime(for: entry.output) != nil
     }
 
     func launchEnvironment(for output: URL) -> [String: String] {
@@ -418,13 +423,22 @@ final class AppModel {
     }
 
     private func launch(output: URL, target: TargetPlatform, diagnostic: Bool = false) {
-        guard target == .windows, !runner.state.isRunning else { return }
+        guard target.runsOnMac, !runner.state.isRunning else { return }
         let entry = library.entry(for: output)
-        let check = preflight(for: output)
-        guard check.canLaunch, let wine = wineRuntime(for: output) else {
+        let check = preflight(for: output, target: target)
+        let wine = target == .windows ? wineRuntime(for: output) : nil
+        guard check.canLaunch, target == .macos || wine != nil else {
             let title = entry?.title ?? output.deletingPathExtension().lastPathComponent
             banner = "\(title) was not launched. " + check.failures.map(\.detail).joined(separator: " ")
             return
+        }
+        if target == .macos {
+            do {
+                try LaunchPreflight.markExecutable(output)
+            } catch {
+                banner = "\(output.lastPathComponent) was not launched: it could not be made executable. \(error.localizedDescription)"
+                return
+            }
         }
         route = .console
         for warning in check.warnings { runner.note(warning.detail) }
@@ -433,8 +447,9 @@ final class AppModel {
             backupSaves(output: output, title: entry.title, titleId: entry.titleId, quiet: true, automatic: true)
         }
         let firstLine = runner.lines.last?.id ?? -1
-        let environment = diagnostic ? LaunchProfile.diagnostic(launchEnvironment(for: output)) : launchEnvironment(for: output)
-        if diagnostic {
+        let base = target == .macos ? nativeLaunchEnvironment(for: output) : launchEnvironment(for: output)
+        let environment = diagnostic && target == .windows ? LaunchProfile.diagnostic(base) : base
+        if diagnostic && target == .windows {
             runner.note("Wine error messages are on for this session only (WINEDEBUG=\(LaunchProfile.diagnosticWineDebug)).")
         }
         let overrides = environment.keys.sorted().map { "\($0)=\(environment[$0] ?? "")" }.joined(separator: " ")
@@ -448,7 +463,10 @@ final class AppModel {
         } else {
             runner.lineObserver = nil
         }
-        runner.run(label: "Launch via \(wine.name)", executable: wine.executable, arguments: [output.path],
+        let label = wine.map { "Launch via \($0.name)" } ?? "Launch natively"
+        let executable = wine?.executable ?? output
+        let arguments = wine == nil ? [] : [output.path]
+        runner.run(label: label, executable: executable, arguments: arguments,
                    workingDirectory: output.deletingLastPathComponent(),
                    environment: environment) { [weak self] code in
             guard let self else { return }
@@ -473,8 +491,10 @@ final class AppModel {
                 for advice in crash.advice {
                     self.runner.note("Next step: \(advice)")
                 }
-                for verb in Set(crash.findings.compactMap(\.winetricksVerb)).sorted() {
-                    self.runner.note("Command: " + WinePrefix.winetricksCommand(verb: verb, environment: environment, wine: wine.executable))
+                if let wine {
+                    for verb in Set(crash.findings.compactMap(\.winetricksVerb)).sorted() {
+                        self.runner.note("Command: " + WinePrefix.winetricksCommand(verb: verb, environment: environment, wine: wine.executable))
+                    }
                 }
                 SystemNotifier.post(title: "\(title) exited with code \(code)",
                                     body: crash.headline ?? "The session log has the full output.")
@@ -483,6 +503,16 @@ final class AppModel {
     }
 
     func preflight(for output: URL) -> LaunchPreflight {
+        preflight(for: output, target: library.entry(for: output)?.target ?? settings.target)
+    }
+
+    func preflight(for output: URL, target: TargetPlatform) -> LaunchPreflight {
+        if target == .macos {
+            return LaunchPreflight(nativeOutput: output, libraries: settings.libraryDirectory(besides: output),
+                                   needsRosetta: system.isAppleSilicon && !system.rosettaInstalled,
+                                   freeBytes: LaunchPreflight.freeBytes(near: output), displays: DisplayProbe.displays(),
+                                   power: PowerState.current())
+        }
         let runtime = wineRuntime(for: output)
         return LaunchPreflight(output: output, runtime: runtime?.executable, runtimeName: runtime?.name,
                                pinnedRuntime: library.entry(for: output)?.launchProfile.wineRuntimePath,
@@ -539,7 +569,7 @@ final class AppModel {
     }
 
     var launchableEntries: [LibraryEntry] {
-        library.entries.filter { $0.target == .windows && $0.succeeded && $0.outputExists }
+        library.entries.filter { $0.target.runsOnMac && $0.succeeded && $0.outputExists }
     }
 
     var lastPlayedEntry: LibraryEntry? {
@@ -549,7 +579,7 @@ final class AppModel {
     }
 
     var canLaunchLastPlayed: Bool {
-        lastPlayedEntry != nil && selectedWine != nil && !runner.state.isRunning
+        lastPlayedEntry.map(hasLaunchRuntime) == true && !runner.state.isRunning
     }
 
     static let confirmLinkLaunchKey = "confirmLinkLaunch"
@@ -573,9 +603,9 @@ final class AppModel {
                 banner = "No converted title matches \u{201C}\(target)\u{201D}."
                 return
             }
-            guard launchableEntries.contains(where: { $0.id == entry.id }), wineRuntime(for: entry.output) != nil else {
+            guard launchableEntries.contains(where: { $0.id == entry.id }), hasLaunchRuntime(entry) else {
                 route = .library
-                banner = "\(entry.title) cannot be launched: it needs a successful Windows conversion, its output folder and a Wine runtime."
+                banner = "\(entry.title) cannot be launched: it needs a successful Windows or macOS conversion, its output folder and, for Windows output, a Wine runtime."
                 return
             }
             guard !runner.state.isRunning else {
@@ -640,7 +670,8 @@ final class AppModel {
         let report = CompatibilityReport(entry: entry,
                                          mac: "\(system.chip), \(system.memoryLabel)",
                                          macOS: system.macOSLabel,
-                                         runtime: entry.target == .windows ? wineRuntime(for: entry.output)?.name : nil,
+                                         runtime: entry.target == .windows ? wineRuntime(for: entry.output)?.name
+                                             : entry.target == .macos ? "Native (Rosetta 2)" : nil,
                                          appVersion: appVersion,
                                          crash: lastCrash(for: entry))
         NSPasteboard.general.clearContents()
@@ -688,10 +719,12 @@ final class AppModel {
     func importSystemLibraries() {
         guard let output = outputExecutable,
               let destination = settings.libraryDirectory(besides: output) else { return }
-        let platform = settings.target == .windows ? "Windows" : "Linux"
+        let platform = settings.target.hostName
         let panel = NSOpenPanel()
         panel.title = "Choose the folder with \(platform) system libraries (*.prx)"
-        panel.message = "Built with `cmake --build build --target libs` on a \(platform) host: build/core/libs/libs"
+        panel.message = settings.target == .macos
+            ? "Built on a Mac with -DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 and `cmake --build build --target libs`: build/core/libs/libs. The project does not release macOS libraries."
+            : "Built with `cmake --build build --target libs` on a \(platform) host: build/core/libs/libs"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         guard panel.runModal() == .OK, let source = panel.url else { return }

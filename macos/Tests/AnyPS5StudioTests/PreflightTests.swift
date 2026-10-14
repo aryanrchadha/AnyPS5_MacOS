@@ -122,3 +122,49 @@ final class LaunchPreflightTests: XCTestCase {
         XCTAssertTrue(PowerState.summary([.lowPower, .hot(critical: true)]).contains("critically hot"))
     }
 }
+
+final class NativeLaunchPreflightTests: XCTestCase {
+    func testReadyWithMacLibraries() throws {
+        let folder = try temporaryDirectory()
+        let output = folder.appendingPathComponent("Game/Game")
+        try write("\u{CF}\u{FA}\u{ED}\u{FE}", to: output)
+        try write("lib", to: folder.appendingPathComponent("Game/libs/\(LaunchPreflight.nativeKernel)"))
+        let check = LaunchPreflight(nativeOutput: output, libraries: folder.appendingPathComponent("Game/libs"),
+                                    needsRosetta: false, freeBytes: 50 * 1024 * 1024 * 1024)
+        XCTAssertEqual(check.checks.map(\.id), ["executable", "libraries", "folder", "disk"])
+        XCTAssertEqual(check.level, .ok)
+        XCTAssertEqual(check.checks[1].detail, "libkernel.prx in libs/")
+    }
+
+    func testMissingLibrariesAndRosettaBlockLaunch() throws {
+        let folder = try temporaryDirectory()
+        let output = folder.appendingPathComponent("Game/Game")
+        try write("\u{CF}\u{FA}\u{ED}\u{FE}", to: output)
+        let check = LaunchPreflight(nativeOutput: output, libraries: folder.appendingPathComponent("Game/libs"),
+                                    needsRosetta: true, freeBytes: nil)
+        XCTAssertFalse(check.canLaunch)
+        XCTAssertEqual(check.failures.map(\.id), ["libraries", "rosetta"])
+        XCTAssertTrue(check.failures[0].detail.contains("does not release them"))
+        XCTAssertFalse(check.checks.contains { $0.title == "Wine runtime" })
+    }
+
+    func testCustomSearchPathIsOnlyWarned() throws {
+        let folder = try temporaryDirectory()
+        let output = folder.appendingPathComponent("Game/Game")
+        try write("\u{CF}\u{FA}\u{ED}\u{FE}", to: output)
+        let check = LaunchPreflight(nativeOutput: output, libraries: nil, needsRosetta: false, freeBytes: nil)
+        XCTAssertTrue(check.canLaunch)
+        XCTAssertEqual(check.warnings.map(\.id), ["libraries"])
+    }
+
+    func testMarkExecutableAddsExecuteBits() throws {
+        let folder = try temporaryDirectory()
+        let output = folder.appendingPathComponent("Game/Game")
+        try write("\u{CF}\u{FA}\u{ED}\u{FE}", to: output)
+        try FileManager.default.setAttributes([.posixPermissions: 0o640], ofItemAtPath: output.path)
+        try LaunchPreflight.markExecutable(output)
+        let mode = try FileManager.default.attributesOfItem(atPath: output.path)[.posixPermissions] as? NSNumber
+        XCTAssertEqual(mode?.intValue, 0o751)
+        XCTAssertTrue(FileManager.default.isExecutableFile(atPath: output.path))
+    }
+}

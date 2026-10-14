@@ -7,7 +7,7 @@ struct ConvertView: View {
     var body: some View {
         Page(eyebrow: "Relinker",
              title: "Convert a PS5 title",
-             subtitle: "Drop a decrypted game folder. The relinker rewrites its executable and modules into a native Windows or Linux image without emulation.") {
+             subtitle: "Drop a decrypted game folder. The relinker rewrites its executable and modules into a native Windows, Linux or macOS image without emulation.") {
             VStack(spacing: 20) {
                 BannerRow()
 
@@ -291,7 +291,7 @@ private struct TargetTile: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(platform.title)
                         .font(.system(size: 13, weight: .semibold))
-                    Text("." + platform.fileExtension)
+                    Text(platform.fileExtension.map { "." + $0 } ?? "no extension")
                         .font(.monoSmall)
                         .foregroundStyle(Theme.textTertiary)
                 }
@@ -371,9 +371,11 @@ private struct OptionsCard: View {
                 CardHeader(eyebrow: "Options", title: "Relinker switches")
                     .padding(.bottom, 8)
 
-                OptionRow(title: "AMD → Intel lowering",
-                          detail: "Required on Apple Silicon. Rosetta 2 implements Intel x86-64, not AMD-only extensions such as SSE4a or CLZERO.",
-                          flag: "--to-intel",
+                OptionRow(title: model.settings.target == .macos ? "AMD → Intel and Rosetta lowering" : "AMD → Intel lowering",
+                          detail: model.settings.target == .macos
+                              ? "Required on Apple Silicon. Also lowers what Rosetta 2 lacks: RDSEED becomes RDRAND, CLWB a no-op and RDPID returns processor 0."
+                              : "Required on Apple Silicon. Rosetta 2 implements Intel x86-64, not AMD-only extensions such as SSE4a or CLZERO.",
+                          flag: model.settings.target == .macos ? "--to-rosetta" : "--to-intel",
                           isOn: $model.settings.toIntel)
                 if !model.settings.toIntel && model.system.isAppleSilicon {
                     Callout(text: "Without lowering, AMD-only instructions will fault under Rosetta.")

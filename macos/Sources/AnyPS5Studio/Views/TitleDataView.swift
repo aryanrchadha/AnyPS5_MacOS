@@ -213,7 +213,7 @@ struct MenuBarContent: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let launchable = model.launchableEntries
+        let launchable = model.launchableEntries.filter(model.hasLaunchRuntime)
         switch model.runner.state {
         case .running(let label, _):
             Text(label + "…")
@@ -223,13 +223,11 @@ struct MenuBarContent: View {
         }
         Divider()
         if launchable.isEmpty {
-            Text("No launchable titles")
-        } else if model.selectedWine == nil {
-            Text("Install a Wine runtime to launch titles")
+            Text(model.launchableEntries.isEmpty ? "No launchable titles" : "Install a Wine runtime to launch titles")
         } else {
             if let last = model.lastPlayedEntry {
                 Button("Continue \(last.title)") { model.launch(last) }
-                    .disabled(model.runner.state.isRunning)
+                    .disabled(model.runner.state.isRunning || !model.hasLaunchRuntime(last))
                 Divider()
             }
             ForEach(launchable.prefix(8)) { entry in

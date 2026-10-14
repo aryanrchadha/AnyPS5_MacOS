@@ -3,6 +3,7 @@ import Foundation
 enum TargetPlatform: String, CaseIterable, Identifiable, Codable {
     case windows
     case linux
+    case macos
 
     var id: String { rawValue }
 
@@ -10,20 +11,39 @@ enum TargetPlatform: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .windows: "Windows PE"
         case .linux: "Linux ELF"
+        case .macos: "macOS Mach-O"
         }
     }
 
-    var fileExtension: String {
+    var fileExtension: String? {
         switch self {
         case .windows: "exe"
         case .linux: "elf"
+        case .macos: nil
         }
+    }
+
+    var hostName: String {
+        switch self {
+        case .windows: "Windows"
+        case .linux: "Linux"
+        case .macos: "macOS"
+        }
+    }
+
+    var runsOnMac: Bool { self != .linux }
+
+    func executable(in folder: URL, name: String) -> URL {
+        let file = folder.appendingPathComponent(name)
+        guard let fileExtension else { return file }
+        return file.appendingPathExtension(fileExtension)
     }
 
     var summary: String {
         switch self {
         case .windows: "Runs on this Mac through Wine, CrossOver or Whisky. Experimental."
         case .linux: "Runs on a Linux x86-64 machine or VM. Cannot start natively on macOS."
+        case .macos: "Runs on this Mac under Rosetta 2 without Wine. Needs system libraries built for macOS. Experimental."
         }
     }
 
@@ -31,6 +51,7 @@ enum TargetPlatform: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .windows: "macwindow.on.rectangle"
         case .linux: "terminal"
+        case .macos: "laptopcomputer"
         }
     }
 }
@@ -76,9 +97,9 @@ struct ConversionSettings: Equatable, Codable {
         switch target {
         case .windows:
             if !trimmed.allSatisfy(\.isASCII) { return "Windows library search paths must be ASCII." }
-        case .linux:
+        case .linux, .macos:
             if !trimmed.hasPrefix("/") && !trimmed.hasPrefix("$ORIGIN") {
-                return "Linux search paths must be absolute or start with $ORIGIN."
+                return "\(target.hostName) search paths must be absolute or start with $ORIGIN."
             }
         }
         return nil
@@ -91,7 +112,8 @@ struct ConversionSettings: Equatable, Codable {
             if windowsGUI { arguments.append("--windows-gui") }
             if windowsDiagnostics { arguments.append("--windows-diagnostics") }
         }
-        if toIntel { arguments.append("--to-intel") }
+        if target == .macos { arguments.append("--macos") }
+        if toIntel { arguments.append(target == .macos ? "--to-rosetta" : "--to-intel") }
         if unusedFilter != .keepAll { arguments.append("unused-filter=\(unusedFilter.rawValue)") }
         if writeRegistry { arguments.append("--registry") }
         let trimmed = runPath.trimmingCharacters(in: .whitespaces)

@@ -68,13 +68,7 @@ struct LaunchPreflight: Equatable {
     init(output: URL, runtime: URL?, runtimeName: String?, pinnedRuntime: String?, needsRosetta: Bool,
          freeBytes: Int64?, displays: [DisplayTarget] = [], power: [PowerState] = [],
          fileManager: FileManager = .default) {
-        var checks: [PreflightCheck] = []
-        var isDirectory: ObjCBool = false
-        let exists = fileManager.fileExists(atPath: output.path, isDirectory: &isDirectory) && !isDirectory.boolValue
-        checks.append(PreflightCheck(
-            id: "executable", title: "Executable",
-            level: exists ? .ok : .failure,
-            detail: exists ? output.lastPathComponent : "\(output.path) is missing. Convert the title again."))
+        var checks = [Self.executableCheck(output, fileManager: fileManager)]
 
         if let runtime {
             let name = runtimeName ?? runtime.lastPathComponent
@@ -97,6 +91,60 @@ struct LaunchPreflight: Equatable {
                                          detail: "Wine runs x86-64 code through Rosetta 2. Run: softwareupdate --install-rosetta --agree-to-license"))
         }
 
+        self.checks = checks + Self.hostChecks(output: output, executableExists: checks[0].level == .ok,
+                                               freeBytes: freeBytes, displays: displays, power: power,
+                                               fileManager: fileManager)
+    }
+
+    init(nativeOutput output: URL, libraries: URL?, needsRosetta: Bool, freeBytes: Int64?,
+         displays: [DisplayTarget] = [], power: [PowerState] = [], fileManager: FileManager = .default) {
+        var checks = [Self.executableCheck(output, fileManager: fileManager)]
+
+        if let libraries {
+            let kernel = libraries.appendingPathComponent(Self.nativeKernel)
+            let found = fileManager.fileExists(atPath: kernel.path)
+            checks.append(PreflightCheck(
+                id: "libraries", title: "macOS system libraries",
+                level: found ? .ok : .failure,
+                detail: found ? "\(Self.nativeKernel) in \(libraries.lastPathComponent)/"
+                              : "\(kernel.path) is missing. The output needs AnyPS5's system libraries built on a Mac; the project does not release them."))
+        } else {
+            checks.append(PreflightCheck(
+                id: "libraries", title: "macOS system libraries", level: .warning,
+                detail: "The library search path is not under the output folder, so it is not checked."))
+        }
+
+        if needsRosetta {
+            checks.append(PreflightCheck(id: "rosetta", title: "Rosetta 2", level: .failure,
+                                         detail: "macOS output is x86-64 code that runs through Rosetta 2. Run: softwareupdate --install-rosetta --agree-to-license"))
+        }
+
+        self.checks = checks + Self.hostChecks(output: output, executableExists: checks[0].level == .ok,
+                                               freeBytes: freeBytes, displays: displays, power: power,
+                                               fileManager: fileManager)
+    }
+
+    static let nativeKernel = "libkernel.prx"
+
+    static func markExecutable(_ output: URL, fileManager: FileManager = .default) throws {
+        let current = (try fileManager.attributesOfItem(atPath: output.path)[.posixPermissions] as? NSNumber)?.intValue ?? 0o644
+        guard current & 0o111 != 0o111 else { return }
+        try fileManager.setAttributes([.posixPermissions: current | 0o111], ofItemAtPath: output.path)
+    }
+
+    private static func executableCheck(_ output: URL, fileManager: FileManager) -> PreflightCheck {
+        var isDirectory: ObjCBool = false
+        let exists = fileManager.fileExists(atPath: output.path, isDirectory: &isDirectory) && !isDirectory.boolValue
+        return PreflightCheck(
+            id: "executable", title: "Executable",
+            level: exists ? .ok : .failure,
+            detail: exists ? output.lastPathComponent : "\(output.path) is missing. Convert the title again.")
+    }
+
+    private static func hostChecks(output: URL, executableExists exists: Bool, freeBytes: Int64?,
+                                   displays: [DisplayTarget], power: [PowerState],
+                                   fileManager: FileManager) -> [PreflightCheck] {
+        var checks: [PreflightCheck] = []
         let folder = output.deletingLastPathComponent()
         if exists {
             let writable = fileManager.isWritableFile(atPath: folder.path)
@@ -125,7 +173,7 @@ struct LaunchPreflight: Equatable {
             checks.append(PreflightCheck(id: "display", title: "Display refresh rate", level: .warning,
                                          detail: advice.joined(separator: " ")))
         }
-        self.checks = checks
+        return checks
     }
 
     static func freeBytes(near url: URL, fileManager: FileManager = .default) -> Int64? {

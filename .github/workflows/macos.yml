@@ -87,9 +87,9 @@ jobs:
         timeout-minutes: 3
         run: |
           library="$HOME/Library/Application Support/AnyPS5 Studio"
-          mkdir -p "$library" /tmp/anyps5-fixture/Long /tmp/anyps5-fixture/Crash /tmp/anyps5-fixture/Linux /tmp/anyps5-fixture/Broken
+          mkdir -p "$library" /tmp/anyps5-fixture/Long /tmp/anyps5-fixture/Crash /tmp/anyps5-fixture/Linux /tmp/anyps5-fixture/Broken /tmp/anyps5-fixture/Mac
           cp macos/Tests/Fixtures/library.json "$library/library.json"
-          for output in Long/eboot.exe Crash/eboot.exe Linux/eboot.elf; do printf 'MZ' > "/tmp/anyps5-fixture/$output"; done
+          for output in Long/eboot.exe Crash/eboot.exe Linux/eboot.elf Mac/eboot; do printf 'MZ' > "/tmp/anyps5-fixture/$output"; done
           reports="$HOME/Library/Logs/DiagnosticReports"
           before=$(ls "$reports" 2>/dev/null | grep -c '^AnyPS5Studio' || true)
           "build-macos/AnyPS5 Studio.app/Contents/MacOS/AnyPS5Studio" > launch.log 2>&1 &

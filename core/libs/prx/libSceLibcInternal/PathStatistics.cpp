@@ -99,6 +99,9 @@ int OpenMetadata(const std::filesystem::path& path, bool directory) {
         return Fail(HostError(error));
     }
     return descriptor;
+#elif defined(__APPLE__)
+    const int descriptor = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | (directory ? O_DIRECTORY : 0));
+    return descriptor < 0 ? Fail(HostError(errno)) : descriptor;
 #else
     const int descriptor = ::open(path.c_str(), O_PATH | O_CLOEXEC | (directory ? O_DIRECTORY : 0));
     return descriptor < 0 ? Fail(HostError(errno)) : descriptor;

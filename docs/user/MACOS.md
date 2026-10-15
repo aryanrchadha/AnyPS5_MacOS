@@ -9,8 +9,8 @@ AnyPS5 Studio is a native SwiftUI front end for the [relinker](USAGE.md). It run
 | Converting `eboot.bin` and its modules | Native. The relinker builds and runs as an arm64 binary.                        |
 | Windows PE output                      | Written on the Mac. Running it needs Wine (CrossOver, Whisky or Homebrew Wine). |
 | Linux ELF output                       | Written on the Mac. Running it needs a Linux x86-64 host.                       |
-| System libraries (`libs/*.prx`)        | Built on a host of the target OS. The project releases Windows and Linux builds only. |
-| Native macOS (Mach-O) output           | Written on the Mac. Cannot run yet: the system libraries it needs do not build on macOS. See [macOS output](#macos-output). |
+| System libraries (`libs/*.prx`)        | Built on a host of the target OS. The project releases Windows and Linux builds; macOS builds come from the *macOS system libraries* workflow or a build on a Mac. |
+| Native macOS (Mach-O) output           | Written on the Mac. Runs under Rosetta 2 without Wine with the macOS system libraries in `libs/`. No game has been run this way. See [macOS output](#macos-output). |
 
 Converted titles are x86-64 programs. On Apple Silicon they execute through Rosetta 2, which implements Intel's instruction set, so keep `--to-intel` enabled (the app's default). Rosetta translates AVX2 from macOS 15 onward; PS5 code uses AVX2, so earlier macOS releases will fault on it.
 
@@ -30,13 +30,15 @@ Measure rather than assume: enable the Metal Performance HUD for the title and r
 
 The *macOS Mach-O* target runs `relinker --macos`, with `--to-rosetta` in place of `--to-intel` while *AMD → Intel and Rosetta lowering* is on. The result is an x86-64 Mach-O executable without a file extension, with the title's modules as Mach-O libraries in `app0/sce_module`, that Apple Silicon runs through Rosetta 2 and that needs no Wine. `--to-rosetta` also lowers instructions Rosetta lacks: RDSEED to RDRAND, CLWB to a no-op, and RDPID to processor 0.
 
-The executable loads `libkernel.prx` and the other system libraries from its library search path, `libs/` beside it by default. Those must be AnyPS5's system libraries built on a Mac for x86-64, and they do not build there yet. A full build (`-DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64`, with submodules) on an Intel macOS 15 runner on 15 October 2026 configured, then reported 65 compile errors in 26 failed targets of libc, libkernel and other libraries before it could not go further (81 in 34 the day before; targets that depend on failed ones are not compiled, so the true count can be higher):
+The executable loads `libkernel.prx` and the other system libraries from its library search path, `libs/` beside it by default. Those are AnyPS5's system libraries built on a Mac for x86-64 (`-DANYPS5_RELINKER_ONLY=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64`, with submodules, then `cmake --build build --target libs`). The *macOS system libraries* workflow (`.github/workflows/macos-libs.yml`, started by hand from the Actions tab) builds them on an Intel macOS 15 runner and uploads the 126 libraries as the `macos-libs-x86_64` artifact; *Import libraries* copies them into `libs/`. If a build fails, its summary lists the compile errors per file.
 
-- they use Linux interfaces macOS lacks: `link.h` and `dl_iterate_phdr`, `memfd_create`, `ppoll` and `POLLRDHUP`, `pthread_getattr_np`, `sched_getcpu`, `RUSAGE_THREAD`, `O_PATH`, `gethostbyname_r`, `st_mtim` and Linux signal contexts (`gregs`, `REG_RIP`);
-- `std::stop_token` and file events no longer block it: the build passes `-fexperimental-library` to Apple's libc++, and file events have a macOS path in place of `eventfd`;
-- parts of the macOS runtime, such as its memory paths, are not in the tree ([libc debt](../dev/debt/libc.md)).
+The libraries compile and link on macOS, but no game has been run with them, and parts of the runtime differ from Linux there:
 
-The *macOS system libraries* workflow (`.github/workflows/macos-libs.yml`, started by hand from the Actions tab) repeats that build, lists the compile errors per file in its summary, and uploads the libraries once they build. Until then, macOS output can be written and inspected but not run, and AnyPS5 Studio has not run a game this way.
+- the guest arena reserves its range with address-hinted `mmap`, since macOS has no `MAP_FIXED_NOREPLACE`, and finds the host regions already in it with `mach_vm_region`; direct memory and anonymous shared memory are backed by unlinked temporary files instead of `memfd_create`;
+- the write watch write-protects pages, so the arena and direct memory report every mapping and protection change to it ([libc debt](../dev/debt/libc.md));
+- reading a directory (`getdirentries`, `getdents`), the TLS module index in module info, and mapping above an address hint without the guest arena throw as not implemented;
+- GPU access to shared direct memory is copied instead of imported, as macOS has no udmabuf, and `APS5_THREAD_PRIORITY` sets the user-interactive QoS class instead of realtime scheduling;
+- graphics go through Vulkan, which needs MoltenVK on macOS; whether the GPU driver's Vulkan requirements are met there has not been checked.
 
 Launch runs the executable directly from its folder, after marking it executable, with the title's launch options as its environment. The pre-launch check fails when `libkernel.prx` is not in `libs/` or Rosetta 2 is missing, and only warns when the search path points outside the output folder. Wine options, winetricks commands, *Launch with Wine Errors* and *Add to Applications* apply to Windows output only.
 

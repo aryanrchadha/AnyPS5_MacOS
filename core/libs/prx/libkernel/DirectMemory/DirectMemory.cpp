@@ -201,6 +201,16 @@ void* MapAtOrAbove(std::uintptr_t start, size_t len, int prot, size_t alignment)
 }
 #endif
 
+void NoteProtection(const void* addr, size_t len, int prot) {
+#ifdef __APPLE__
+    GuestWriteWatch::GuestWriteWatchProtectionChanged_nid_postfix(addr, len, prot);
+#else
+    (void)addr;
+    (void)len;
+    (void)prot;
+#endif
+}
+
 void ValidateLength(size_t len) {
     if (len == 0 || (len & (PS5_PAGE_SIZE - 1)) != 0) {
         // return SCE_KERNEL_ERROR_EINVAL;
@@ -352,6 +362,7 @@ public:
         GuestArena::GuestArenaMapDirect_nid_postfix(reinterpret_cast<void*>(address), bytes, section, offset, WinProtFromPosix(protection));
 #else
         if (::mmap(reinterpret_cast<void*>(address), bytes, protection, MAP_SHARED | MAP_FIXED, file, static_cast<off_t>(fileOffset + offset)) == MAP_FAILED) throw std::system_error(errno, std::generic_category(), "map direct memory backing");
+        NoteProtection(reinterpret_cast<void*>(address), bytes, protection);
 #endif
     }
 
@@ -682,7 +693,9 @@ bool RemapFixedIntoRegistered(GuestAllocations::Mutation& mutation, void* addr, 
 bool ArenaAvailable() { return GuestArena::GuestArenaAvailable_nid_postfix(); }
 
 void* ArenaCommit(void* addr, size_t len, int prot) {
-    return mmap(addr, len, prot, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    void* placed = mmap(addr, len, prot, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    if (placed != MAP_FAILED) NoteProtection(placed, len, prot);
+    return placed;
 }
 
 void ArenaForget(void* addr, size_t len) {
@@ -771,6 +784,7 @@ void* MapPlaced(void* addr, size_t len, int prot, int flags, size_t alignment) {
             // return SCE_KERNEL_ERROR_ENOMEM;
             throw std::system_error(errno, std::generic_category(), "Fixed mmap failed");
         }
+        NoteProtection(result, len, prot);
         return result;
     }
     if (addr) {
@@ -1014,6 +1028,7 @@ int DoMapFileBacked_nid_no_patch(void** addr, size_t len, int prot, int flags, i
         Unmap(mapped, len);
         throw std::system_error(error, std::generic_category(), "map guest shared memory");
     }
+    NoteProtection(mapped, len, nativeProtection);
     try {
         mutation.Add(mapped, len, (prot & 3) != 0, (prot & 2) != 0, false);
     } catch (...) {
@@ -1045,6 +1060,7 @@ int DoMapShared(void** addr, size_t len, int prot, HostSharedMemory object) {
         GuestArena::GuestArenaMap_nid_postfix(mapped, len, object, 0, WinProtFromPosix(nativeProtection));
 #else
         if (::mmap(mapped, len, nativeProtection, MAP_SHARED | MAP_FIXED, object, 0) == MAP_FAILED) throw std::system_error(errno, std::generic_category(), "map shared memory");
+        NoteProtection(mapped, len, nativeProtection);
 #endif
         mutation.Add(mapped, len, (prot & 3) != 0, (prot & 2) != 0, false);
     } catch (...) {
@@ -1099,6 +1115,7 @@ int DoMprotect(const void* addr, size_t len, int prot) {
         if (nativeProtection != PROT_NONE && !KernelArena::Get().Owns(insidePointer, insideBytes)) CommitReservedPages(insidePointer, insideBytes);
 #endif
         if (mprotect(insidePointer, insideBytes, nativeProtection) != 0) throw std::system_error(errno, std::generic_category(), "mprotect failed");
+        NoteProtection(insidePointer, insideBytes, nativeProtection);
         NoteGuestStackProtection(inside, insideBytes, (prot & 3) == 3);
         RecordProtection(insidePointer, insideBytes, prot);
         return 0;
@@ -1122,6 +1139,7 @@ int DoMprotect(const void* addr, size_t len, int prot) {
     for (const auto& [span, spanBytes] : spans) {
         mutation.Protect(span, spanBytes, (prot & 3) != 0, (prot & 2) != 0, (prot & GuestProtGpuReadWrite) != 0, [&] {
             if (mprotect(const_cast<void*>(span), spanBytes, nativeProtection) != 0) throw std::system_error(errno, std::generic_category(), "mprotect failed");
+            NoteProtection(span, spanBytes, nativeProtection);
         });
         RecordProtection(span, spanBytes, prot);
     }

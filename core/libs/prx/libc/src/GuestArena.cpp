@@ -490,7 +490,11 @@ int PosixProtection(std::uint32_t windowsProtection) {
 }
 
 void* PlaceAt(void* pointer, std::size_t bytes, std::uint32_t protection) {
-    return mmap(pointer, bytes, PosixProtection(protection), MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    void* placed = mmap(pointer, bytes, PosixProtection(protection), MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+#ifdef __APPLE__
+    if (placed != MAP_FAILED) GuestWriteWatch::GuestWriteWatchProtectionChanged_nid_postfix(placed, bytes, PosixProtection(protection));
+#endif
+    return placed;
 }
 }
 #endif
@@ -500,6 +504,9 @@ void GuestArenaSetProtection_nid_postfix(std::uintptr_t address, std::size_t byt
     if (!Arena::Get().Contains(reinterpret_cast<void*>(address), bytes)) throw OutsideArena("set protection", reinterpret_cast<void*>(address), bytes);
     if (mprotect(reinterpret_cast<void*>(address), bytes, PosixProtection(protection)) != 0)
         throw std::system_error(errno, std::generic_category(), "guest arena protection failed");
+#ifdef __APPLE__
+    GuestWriteWatch::GuestWriteWatchProtectionChanged_nid_postfix(reinterpret_cast<void*>(address), bytes, PosixProtection(protection));
+#endif
 }
 
 void GuestArenaCommit_nid_postfix(void* pointer, std::size_t bytes, std::uint32_t protection, std::size_t granule) {

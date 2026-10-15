@@ -19,6 +19,9 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#elif defined(__APPLE__)
+#include <crt_externs.h>
+#include <dlfcn.h>
 #else
 #include <dlfcn.h>
 #include <link.h>
@@ -61,7 +64,15 @@ void* Symbol(Module& module, const char* name) {
     return ::dlsym(module.native, name);
 #endif
 }
-#ifndef _WIN32
+#ifdef __APPLE__
+bool FromGuestModule(void* address) {
+    Dl_info info{};
+    if (address == nullptr || !::dladdr(address, &info) || info.dli_fname == nullptr || info.dli_fbase == nullptr) return false;
+    if (info.dli_fbase == static_cast<const void*>(_NSGetMachExecuteHeader())) return true;
+    const std::string path(info.dli_fname);
+    return path.ends_with(".prx");
+}
+#elif !defined(_WIN32)
 const link_map* MainProgramMap() {
     static const link_map* const map = [] {
         void* handle = ::dlopen(nullptr, RTLD_LAZY);
@@ -82,7 +93,9 @@ bool FromGuestModule(void* address) {
     const std::string path(info.dli_fname);
     return path.ends_with(".prx");
 }
+#endif
 
+#ifndef _WIN32
 void* DefaultScopeSymbol(const char* symbolName) {
     auto* result = ::dlsym(RTLD_DEFAULT, symbolName);
     return FromGuestModule(result) ? result : nullptr;

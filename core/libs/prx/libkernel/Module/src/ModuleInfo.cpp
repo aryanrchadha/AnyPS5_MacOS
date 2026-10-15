@@ -147,9 +147,6 @@ void Fill(const dl_phdr_info& image, TInfo& info) {
             segment.prot = ((header.p_flags & PF_R) ? ProtRead : 0) | ((header.p_flags & PF_W) ? ProtWrite : 0) | ((header.p_flags & PF_X) ? ProtExecute : 0);
         } else if constexpr (Extended<TInfo>) {
             if (header.p_type == PT_TLS) {
-#ifdef __APPLE__
-                NotImplemented_nid_no_patch("TLS module index of a macOS image");
-#endif
                 info.tls_init_addr = address;
                 info.tls_init_size = ToU32(header.p_filesz, "TLS image size");
                 info.tls_size = ToU32(header.p_memsz, "TLS size");

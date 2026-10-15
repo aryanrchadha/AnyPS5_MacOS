@@ -35,6 +35,7 @@ DEBT_DIR = "docs/dev/debt/"
 DEBT_TARGET = re.compile(r"\]\((?:\.\./)+(core/[^)#\s]+)")
 
 CONVENTIONAL = re.compile(r"^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: \S")
+GIT_REVERT = re.compile(r'^Revert "\S.*"( \(#\d+\))?$')
 STRINGS = re.compile(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'')
 TOKENS = re.compile(r'"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'|//[^\n]*|/\*.*?\*/', re.S)
 ALLOWED_COMMENT = re.compile(r"^\s*(#\s*endif\b|}\s*;?\s*//\s*(end\s+)?namespace\b)")
@@ -200,7 +201,7 @@ class Check:
     def commits(self):
         for line in git("log", "--no-merges", "--format=%h %s", f"{self.base}..{self.head}").splitlines():
             sha, subject = line.split(" ", 1)
-            if not CONVENTIONAL.match(subject):
+            if not CONVENTIONAL.match(subject) and not GIT_REVERT.match(subject):
                 self.report("commit-subject", "", 0, f"{sha} {subject}")
 
     def pull_request(self, title, body):

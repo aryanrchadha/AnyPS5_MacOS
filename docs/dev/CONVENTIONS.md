@@ -12,6 +12,6 @@
 
 Comments in code can only be added to indicate areas of [technical debt](TechnicalDebt.md) (only by a human), the end of `#endif`, and the end of namespace.
 
-[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). A commit made by `git revert` may keep its default subject, `Revert "<subject>"`, optionally followed by ` (#<pull request>)`.
 
 There's no need to add image files to the repository. You can add images to the [gist](https://gist.github.com/boykopovar/0e53f2e1426f29ecd41e3b51540b8a90) comments and paste a link into the md file.

@@ -2494,6 +2494,10 @@ ImportProbe ProbeDmaBufImportWriteProtection(const Context& context) {
     static_cast<void>(context);
     probe.failure = "the Linux write watch";
     return probe;
+#elif defined(__APPLE__)
+    static_cast<void>(context);
+    probe.failure = "dma-buf import, which macOS lacks";
+    return probe;
 #else
     if (!context.dmaBufImport) {
         probe.failure = "dma-buf import support";

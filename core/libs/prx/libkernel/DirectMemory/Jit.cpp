@@ -26,6 +26,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <cstdlib>
+#include <filesystem>
+#endif
 #endif
 
 namespace {
@@ -140,7 +144,13 @@ int DuplicateDescriptor(int descriptor) {
 }
 #else
 int CreateBacking(std::size_t bytes, int* descriptor, std::shared_ptr<JitObject>* object) {
+#ifdef __APPLE__
+    auto pattern = (std::filesystem::temp_directory_path() / "anyps5-jit-XXXXXX").string();
+    const int file = ::mkostemp(pattern.data(), O_CLOEXEC);
+    if (file >= 0) ::unlink(pattern.c_str());
+#else
     const int file = memfd_create("anyps5 jit shared memory", MFD_CLOEXEC);
+#endif
     if (file < 0) return HostFailure("create JIT shared memory", errno);
     const bool representable = bytes <= static_cast<std::uint64_t>(std::numeric_limits<off_t>::max());
     if (!representable || ftruncate(file, static_cast<off_t>(bytes)) != 0) {

@@ -15,6 +15,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <cerrno>
+#include <mutex>
 #include <new>
 #include <string>
 #include <type_traits>
@@ -176,6 +177,17 @@ GuestResolver::HostEntry* APS5_VABI gethostbyname_nid_postfix(const char* name) 
             const auto error = WSAGetLastError();
             *sceNetErrnoLoc() = error == WSAHOST_NOT_FOUND ? 1 : error == WSATRY_AGAIN ? 2 : error == WSANO_DATA ? 4 : 3;
             return nullptr;
+        }
+#elif defined(__APPLE__)
+        static std::mutex lookupMutex;
+        std::unique_lock lookupLock(lookupMutex, std::defer_lock);
+        if (!numeric) {
+            lookupLock.lock();
+            native = ::gethostbyname(name);
+            if (!native) {
+                *sceNetErrnoLoc() = h_errno != 0 ? h_errno : 3;
+                return nullptr;
+            }
         }
 #else
         std::vector<char> buffer;

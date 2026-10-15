@@ -16,7 +16,19 @@
 #include <windows.h>
 #else
 #include <fcntl.h>
+#ifdef __APPLE__
+#include <cstdint>
+struct udmabuf_create {
+    std::uint32_t memfd;
+    std::uint32_t flags;
+    std::uint64_t offset;
+    std::uint64_t size;
+};
+constexpr std::uint32_t UDMABUF_FLAGS_CLOEXEC = 1;
+constexpr unsigned long UDMABUF_CREATE = 0;
+#else
 #include <linux/udmabuf.h>
+#endif
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -321,6 +333,10 @@ const char* createHostPointerImport(const Context& context, HostImport& entry, V
 #ifndef _WIN32
 int udmabufDevice() {
     static const int device = [] {
+#ifdef __APPLE__
+        std::fprintf(stderr, "[gpu] macOS has no udmabuf; shared direct memory is copied instead of imported, and GPU stores through FLAT/GLOBAL addresses do not reach it\n");
+        return -1;
+#endif
         const int result = open("/dev/udmabuf", O_RDWR | O_CLOEXEC);
         if (result < 0) {
             const int error = errno;
@@ -2477,6 +2493,10 @@ ImportProbe ProbeDmaBufImportWriteProtection(const Context& context) {
 #ifdef _WIN32
     static_cast<void>(context);
     probe.failure = "the Linux write watch";
+    return probe;
+#elif defined(__APPLE__)
+    static_cast<void>(context);
+    probe.failure = "dma-buf import, which macOS lacks";
     return probe;
 #else
     if (!context.dmaBufImport) {

@@ -4,9 +4,18 @@
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <mach-o/loader.h>
+#include <atomic>
 #include <cstring>
 
 namespace {
+
+std::atomic<unsigned long long> removedImages{0};
+
+void CountRemovedImage(const mach_header*, intptr_t) {
+    removedImages.fetch_add(1, std::memory_order_relaxed);
+}
+
+const bool removalCounted = (_dyld_register_func_for_remove_image(CountRemovedImage), true);
 
 constexpr std::uint64_t MetaVersion = 2;
 constexpr std::size_t LoadBiasOffset = 0x08;
@@ -34,6 +43,8 @@ extern "C" int dl_iterate_phdr(int (*callback)(dl_phdr_info*, std::size_t, void*
         info.dlpi_name = header->filetype == MH_EXECUTE ? "" : _dyld_get_image_name(index);
         info.dlpi_phdr = reinterpret_cast<const Elf64_Phdr*>(meta + HeadersOffset);
         info.dlpi_phnum = static_cast<std::uint16_t>(count);
+        info.dlpi_adds = _dyld_image_count();
+        info.dlpi_subs = removedImages.load(std::memory_order_relaxed);
         if (const int result = callback(&info, sizeof(info), data); result != 0) return result;
     }
     return 0;

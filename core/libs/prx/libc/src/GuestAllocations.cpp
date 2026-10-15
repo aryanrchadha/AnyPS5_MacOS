@@ -23,7 +23,11 @@
 #include <sstream>
 #include <system_error>
 #include <vector>
+#ifdef __APPLE__
+#include "prx/libc/include/specifics/linux/ElfTypes.hpp"
+#else
 #include <link.h>
+#endif
 #include <sys/mman.h>
 #include <unistd.h>
 #endif

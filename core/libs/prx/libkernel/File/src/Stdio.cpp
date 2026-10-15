@@ -446,7 +446,9 @@ static int NativeFstatfs(int descriptor, KernelStatfs* fs) {
     if (::fstatvfs(descriptor, &host) != 0) return SceErrorFromErrno(errno) & 0xffff;
     if (host.f_flag & ST_RDONLY) fs->f_flags |= KERNEL_MNT_RDONLY;
     if (host.f_flag & ST_NOSUID) fs->f_flags |= KERNEL_MNT_NOSUID;
+#ifdef ST_NOEXEC
     if (host.f_flag & ST_NOEXEC) fs->f_flags |= KERNEL_MNT_NOEXEC;
+#endif
     fs->f_bsize = host.f_frsize != 0 ? host.f_frsize : host.f_bsize;
     fs->f_iosize = host.f_bsize;
     fs->f_blocks = host.f_blocks;
@@ -912,6 +914,8 @@ int APS5_VABI sceKernelFdatasync(int fd) {
     if (GuestSockets::IsOpen(fd)) return SceErrorFromErrno(GUEST_EINVAL);
 #ifdef _WIN32
     if (NativeSync(fd) != 0) return SceErrorFromErrno(errno);
+#elif defined(__APPLE__)
+    if (::fsync(fd) != 0) return SceErrorFromErrno(errno);
 #else
     if (::fdatasync(fd) != 0) return SceErrorFromErrno(errno);
 #endif
@@ -935,6 +939,21 @@ int APS5_VABI sceKernelGetdirentries(int fd, char* buf, int nbytes, int64_t* bas
     if (nbytes <= 0) return SceErrorFromErrno(GUEST_EINVAL);
     if (basep != nullptr) *basep = 0;
     return File::ReadDirectoryDescriptor(fd, buf, nbytes);
+}
+
+int APS5_VABI sceKernelGetdents(int fd, char* buf, int nbytes) {
+    return sceKernelGetdirentries(fd, buf, nbytes, nullptr);
+}
+
+#elif defined(__APPLE__)
+
+int APS5_VABI sceKernelGetdirentries(int fd, char* buf, int nbytes, int64_t* basep) {
+    (void)fd;
+    (void)buf;
+    (void)nbytes;
+    (void)basep;
+    NotImplemented_nid_no_patch("sceKernelGetdirentries on macOS");
+    return SceErrorFromErrno(GUEST_EINVAL);
 }
 
 int APS5_VABI sceKernelGetdents(int fd, char* buf, int nbytes) {

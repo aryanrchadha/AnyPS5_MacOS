@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fcntl.h>
+#include <link.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fstream>
@@ -135,6 +136,25 @@ static void CommitReservedPages(void* addr, size_t len) {
     }
 }
 
+static std::uintptr_t AboveStackGuard(std::uintptr_t start, std::uintptr_t end) {
+    auto cursor = start;
+    while (cursor < end) {
+        MEMORY_BASIC_INFORMATION memory{};
+        if (VirtualQuery(reinterpret_cast<void*>(cursor), &memory, sizeof(memory)) != sizeof(memory))
+            throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), "VirtualQuery failed");
+        if (memory.State != MEM_RESERVE && (memory.State != MEM_COMMIT || (memory.Protect & PAGE_GUARD) == 0)) break;
+        cursor = std::min(end, reinterpret_cast<std::uintptr_t>(memory.BaseAddress) + memory.RegionSize);
+    }
+    return cursor;
+}
+
+static bool AtStackReserveBottom(std::uintptr_t start, std::uintptr_t end) {
+    MEMORY_BASIC_INFORMATION memory{};
+    if (VirtualQuery(reinterpret_cast<void*>(start), &memory, sizeof(memory)) != sizeof(memory))
+        throw std::system_error(static_cast<int>(GetLastError()), std::system_category(), "VirtualQuery failed");
+    return memory.State == MEM_RESERVE && reinterpret_cast<std::uintptr_t>(memory.AllocationBase) == start && reinterpret_cast<std::uintptr_t>(memory.BaseAddress) + memory.RegionSize > end;
+}
+
 static int mprotect(void* addr, size_t len, int prot) {
     GuestArena::GuestArenaSetProtection_nid_postfix(reinterpret_cast<std::uintptr_t>(addr), len, WinProtFromPosix(prot));
     if (prot != PROT_NONE && KernelArena::Get().Owns(addr, len)) CommitArenaRange(addr, len, WinProtFromPosix(prot));
@@ -155,6 +175,32 @@ static int mprotect(void* addr, size_t len, int prot) {
         cursor = regionEnd;
     }
     return 0;
+}
+#endif
+
+#if defined(__linux__)
+static void MapUnmappedPages(void* addr, size_t len) {
+    constexpr std::uintptr_t hostPage = 0x1000;
+    auto cursor = reinterpret_cast<std::uintptr_t>(addr);
+    const auto end = cursor + len;
+    const auto half = [&](std::size_t bytes) { return std::max<std::size_t>(hostPage, (bytes / 2) & ~(hostPage - 1)); };
+    while (cursor < end) {
+        auto* run = reinterpret_cast<void*>(cursor);
+        auto bytes = static_cast<std::size_t>(end - cursor);
+        if (::msync(run, hostPage, MS_ASYNC) == 0) {
+            while (bytes > hostPage && ::msync(run, bytes, MS_ASYNC) != 0) bytes = half(bytes);
+            cursor += bytes;
+            continue;
+        }
+        void* mapped = MAP_FAILED;
+        while ((mapped = ::mmap(run, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE | MAP_NORESERVE, -1, 0)) == MAP_FAILED && errno == EEXIST && bytes > hostPage) bytes = half(bytes);
+        if (mapped != run) {
+            const int error = mapped == MAP_FAILED ? errno : EEXIST;
+            if (mapped != MAP_FAILED) ::munmap(mapped, bytes);
+            throw std::system_error(error, std::generic_category(), "cannot map the unmapped pages of a host stack");
+        }
+        cursor += bytes;
+    }
 }
 #endif
 
@@ -1087,6 +1133,35 @@ static bool IsGuestModuleImage(const void* base) {
     }
     return false;
 }
+#else
+struct GuestImageSearch {
+    std::uintptr_t address = 0;
+    std::uintptr_t base = 0;
+    std::uintptr_t pageSize = 0;
+    bool guestModule = false;
+    bool first = true;
+    bool main = false;
+    bool found = false;
+};
+
+static int FindImageContaining(dl_phdr_info* image, std::size_t, void* data) {
+    auto& search = *static_cast<GuestImageSearch*>(data);
+    const bool main = search.first;
+    search.first = false;
+    for (int index = 0; index < image->dlpi_phnum; ++index) {
+        const auto& header = image->dlpi_phdr[index];
+        if (header.p_type != PT_LOAD) continue;
+        const auto start = (image->dlpi_addr + header.p_vaddr) & ~(search.pageSize - 1);
+        const auto end = (image->dlpi_addr + header.p_vaddr + header.p_memsz + search.pageSize - 1) & ~(search.pageSize - 1);
+        if (search.address < start || search.address >= end) continue;
+        search.base = image->dlpi_addr;
+        search.guestModule = image->dlpi_name != nullptr && std::string_view(image->dlpi_name).ends_with(".guest.prx");
+        search.main = main;
+        search.found = true;
+        return 1;
+    }
+    return 0;
+}
 #endif
 
 int DoMprotect(const void* addr, size_t len, int prot) {
@@ -1106,17 +1181,39 @@ int DoMprotect(const void* addr, size_t len, int prot) {
     std::uintptr_t stackEnd = 0;
     if ((prot & GuestProtGpuReadWrite) == 0 && GuestThreadStack(address, &stackStart, &stackEnd) && address >= stackStart && address + len <= stackEnd) {
         constexpr std::uintptr_t hostPageMask = 0xfff;
-        const auto inside = std::max(first, (stackStart + hostPageMask) & ~hostPageMask);
+        const auto requested = std::max(first, (stackStart + hostPageMask) & ~hostPageMask);
         const auto insideEnd = std::min(end, stackEnd & ~hostPageMask);
-        if (inside >= insideEnd) return 0;
+        if (requested >= insideEnd) return 0;
+        auto* requestedPointer = reinterpret_cast<void*>(requested);
+        const auto requestedBytes = static_cast<std::size_t>(insideEnd - requested);
+#ifdef _WIN32
+        const bool hostStack = !KernelArena::Get().Owns(requestedPointer, requestedBytes);
+        const bool reserveBottom = hostStack && nativeProtection != PROT_NONE && AtStackReserveBottom(requested, insideEnd);
+        const auto inside = hostStack && !reserveBottom ? AboveStackGuard(requested, insideEnd) : requested;
+        if (inside == insideEnd) {
+            RecordProtection(requestedPointer, requestedBytes, prot);
+            return 0;
+        }
+#else
+        const auto inside = requested;
+#endif
         auto* insidePointer = reinterpret_cast<void*>(inside);
         const auto insideBytes = static_cast<std::size_t>(insideEnd - inside);
 #ifdef _WIN32
-        if (nativeProtection != PROT_NONE && !KernelArena::Get().Owns(insidePointer, insideBytes)) CommitReservedPages(insidePointer, insideBytes);
+        if (nativeProtection != PROT_NONE && hostStack) CommitReservedPages(insidePointer, insideBytes);
+        const bool protectedPages = mprotect(insidePointer, insideBytes, nativeProtection) == 0;
+#else
+        bool protectedPages = mprotect(insidePointer, insideBytes, nativeProtection) == 0;
+        if (!protectedPages && errno == ENOMEM) {
+            MapUnmappedPages(insidePointer, static_cast<std::size_t>((stackEnd & ~hostPageMask) - inside));
+            protectedPages = mprotect(insidePointer, insideBytes, nativeProtection) == 0;
+        }
 #endif
-        if (mprotect(insidePointer, insideBytes, nativeProtection) != 0) throw std::system_error(errno, std::generic_category(), "mprotect failed");
+        if (!protectedPages) throw std::system_error(errno, std::generic_category(), "mprotect failed");
         NoteProtection(insidePointer, insideBytes, nativeProtection);
+        if (inside != requested) RecordProtection(requestedPointer, static_cast<std::size_t>(inside - requested), prot);
         NoteGuestStackProtection(inside, insideBytes, (prot & 3) == 3);
+        GuestAllocations::GuestAllocationsInvalidate_nid_postfix(inside, insideBytes);
         RecordProtection(insidePointer, insideBytes, prot);
         return 0;
     }
@@ -1131,6 +1228,12 @@ int DoMprotect(const void* addr, size_t len, int prot) {
     }
 #else
     mutation.RegisterMainImage();
+    GuestImageSearch image{.address = address, .pageSize = static_cast<std::uintptr_t>(::sysconf(_SC_PAGESIZE))};
+    dl_iterate_phdr(FindImageContaining, &image);
+    if (image.found && !image.main) {
+        if (!image.guestModule) throw std::invalid_argument("Memory protection of a foreign image is not supported");
+        mutation.RegisterImage(reinterpret_cast<const void*>(image.base));
+    }
 #endif
     std::vector<std::pair<const void*, std::size_t>> spans;
     mutation.ForRegistered(pointer, bytes, [&](const void* span, std::size_t spanBytes) { spans.emplace_back(span, spanBytes); });

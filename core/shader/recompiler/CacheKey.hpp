@@ -52,6 +52,7 @@ public:
         append(key, request.context.pixel);
         append(key, request.context.vertex);
         append(key, request.context.floatMode);
+        append(key, request.context.convertedSamples);
         appendFallbacks(key, request);
         appendMesh(key, request);
         appendTessellation(key, request);
@@ -85,6 +86,7 @@ private:
         append(key, request.context.pixel);
         append(key, request.context.vertex);
         append(key, request.context.floatMode);
+        append(key, request.context.convertedSamples);
         appendFallbacks(key, request);
         appendMesh(key, request);
         appendTessellation(key, request);
@@ -104,7 +106,7 @@ private:
         const auto* mesh = request.graphics && request.graphics->mesh ? &*request.graphics->mesh : nullptr;
         append(key, mesh != nullptr);
         if (mesh == nullptr) return;
-        for (const auto value : {mesh->inputPrimitive, mesh->primitivesPerGroup, mesh->verticesPerGroup, mesh->maxVertices, mesh->maxPrimitives, mesh->threadsPerGroup, mesh->ldsSizeDwords, mesh->provokingVertex, mesh->esgsItemSize}) append(key, value);
+        for (const auto value : {mesh->inputPrimitive, mesh->primitivesPerGroup, mesh->verticesPerGroup, mesh->maxVertices, mesh->maxPrimitives, mesh->threadsPerGroup, mesh->ldsSizeDwords, mesh->provokingVertex, mesh->esgsItemSize, mesh->outputPrimitiveSize}) append(key, value);
     }
 
     static void appendTessellation(std::vector<std::uint64_t>& key, const RecompileRequest& request) {
@@ -261,6 +263,8 @@ private:
         append(key, value.registrationWordLimit);
         append(key, value.vertexSubgroups);
         append(key, value.float16DenormPreserve);
+        append(key, value.spannedWaves);
+        append(key, value.robustBufferAccess2);
     }
 };
 

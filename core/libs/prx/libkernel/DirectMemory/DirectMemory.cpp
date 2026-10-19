@@ -182,7 +182,7 @@ static int mprotect(void* addr, size_t len, int prot) {
 }
 #endif
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 static void MapUnmappedPages(void* addr, size_t len) {
     constexpr std::uintptr_t hostPage = 0x1000;
     auto cursor = reinterpret_cast<std::uintptr_t>(addr);
@@ -197,12 +197,22 @@ static void MapUnmappedPages(void* addr, size_t len) {
             continue;
         }
         void* mapped = MAP_FAILED;
+#ifdef __APPLE__
+        while ((mapped = ::mmap(run, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0)) != MAP_FAILED && mapped != run && bytes > hostPage) {
+            ::munmap(mapped, bytes);
+            bytes = half(bytes);
+        }
+#else
         while ((mapped = ::mmap(run, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE | MAP_NORESERVE, -1, 0)) == MAP_FAILED && errno == EEXIST && bytes > hostPage) bytes = half(bytes);
+#endif
         if (mapped != run) {
             const int error = mapped == MAP_FAILED ? errno : EEXIST;
             if (mapped != MAP_FAILED) ::munmap(mapped, bytes);
             throw std::system_error(error, std::generic_category(), "cannot map the unmapped pages of a host stack");
         }
+#ifdef __APPLE__
+        GuestWriteWatch::GuestWriteWatchProtectionChanged_nid_postfix(run, bytes, PROT_READ | PROT_WRITE);
+#endif
         cursor += bytes;
     }
 }

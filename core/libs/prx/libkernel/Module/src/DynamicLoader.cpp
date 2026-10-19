@@ -20,6 +20,7 @@
 #endif
 #include <windows.h>
 #elif defined(__APPLE__)
+#include "prx/libc/include/specifics/linux/ElfTypes.hpp"
 #include <crt_externs.h>
 #include <dlfcn.h>
 #else
@@ -71,6 +72,28 @@ bool FromGuestModule(void* address) {
     if (info.dli_fbase == static_cast<const void*>(_NSGetMachExecuteHeader())) return true;
     const std::string path(info.dli_fname);
     return path.ends_with(".prx");
+}
+
+struct LoadBiasSearch {
+    void* handle = nullptr;
+    std::uintptr_t bias = 0;
+};
+
+int FindLoadBias(dl_phdr_info* image, std::size_t, void* data) {
+    auto& search = *static_cast<LoadBiasSearch*>(data);
+    if (image->dlpi_name == nullptr || image->dlpi_name[0] == '\0') return 0;
+    void* handle = ::dlopen(image->dlpi_name, RTLD_LAZY | RTLD_NOLOAD);
+    if (handle == nullptr) return 0;
+    ::dlclose(handle);
+    if (handle != search.handle) return 0;
+    search.bias = image->dlpi_addr;
+    return 1;
+}
+
+std::uintptr_t LoadBias(void* handle) {
+    LoadBiasSearch search{.handle = handle};
+    dl_iterate_phdr(FindLoadBias, &search);
+    return search.bias;
 }
 #elif !defined(_WIN32)
 const link_map* MainProgramMap() {
@@ -255,6 +278,8 @@ int APS5_VABI dlclose_nid_postfix(void* handle) {
         GuestAllocations::Mutation mutation;
 #ifdef _WIN32
         mutation.UnregisterImage(module->native);
+#elif defined(__APPLE__)
+        mutation.UnregisterImage(reinterpret_cast<const void*>(LoadBias(module->native)));
 #else
         mutation.UnregisterImage(reinterpret_cast<const void*>(static_cast<link_map*>(module->native)->l_addr));
 #endif

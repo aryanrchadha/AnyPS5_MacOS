@@ -26,7 +26,11 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fcntl.h>
+#ifdef __APPLE__
+#include "prx/libc/include/specifics/linux/ElfTypes.hpp"
+#else
 #include <link.h>
+#endif
 #include <sys/mman.h>
 #include <unistd.h>
 #include <fstream>
